@@ -9,5 +9,6 @@ class MainActivity : AudioServiceActivity() {
         StreamExtractorChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         DownloadChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         CookieChannel.register(flutterEngine.dartExecutor.binaryMessenger)
+        UpdateChannel(this).register(flutterEngine.dartExecutor.binaryMessenger)
     }
 }
