@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/account.dart';
 import '../../data/library_repository.dart';
 import 'downloads_view.dart';
 import '../../innertube/models.dart';
@@ -44,6 +45,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final playlists = ref.watch(savedPlaylistsProvider).value ?? const <PlaylistItem>[];
     final albums = ref.watch(savedAlbumsProvider).value ?? const <AlbumItem>[];
     final artists = ref.watch(savedArtistsProvider).value ?? const <ArtistItem>[];
+    // Signed in: the YouTube Music library joins the local one (local items win on duplicates).
+    List<T> account<T extends YTItem>(LibraryPage page, List<T> local) {
+      final ids = local.map((e) => e.id).toSet();
+      return (ref.watch(accountLibraryProvider(page)).value ?? const [])
+          .whereType<T>()
+          .where((e) => !ids.contains(e.id))
+          .toList();
+    }
+
+    final accountPlaylists = account<PlaylistItem>(LibraryPage.playlists, playlists);
+    final accountAlbums = account<AlbumItem>(LibraryPage.albums, albums);
+    final accountArtists = account<ArtistItem>(LibraryPage.artists, artists);
+    final accountSongs = account<SongItem>(LibraryPage.songs, liked);
+    final songs = [...liked, ...accountSongs];
 
     final entries = <_Entry>[
       if (_filter == null || _filter == LibraryFilter.playlists) ...[
@@ -62,11 +77,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         for (final p in local) _Entry.local(p, onTap: () => openLocalPlaylist(context, ref, p.id)),
         for (final p in playlists) _Entry.item(p),
+        for (final p in accountPlaylists) _Entry.item(p),
       ],
       if (_filter == null || _filter == LibraryFilter.albums)
-        for (final a in albums) _Entry.item(a),
+        for (final a in [...albums, ...accountAlbums]) _Entry.item(a),
       if (_filter == null || _filter == LibraryFilter.artists)
-        for (final a in artists) _Entry.item(a),
+        for (final a in [...artists, ...accountArtists]) _Entry.item(a),
     ];
 
     return Scaffold(
@@ -139,7 +155,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           if (_filter == LibraryFilter.downloads)
             const DownloadsSliver()
           else if (_filter == LibraryFilter.songs)
-            liked.isEmpty
+            songs.isEmpty
                 ? const SliverFillRemaining(
                     hasScrollBody: false,
                     child: EmptyView(
@@ -149,10 +165,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ),
                   )
                 : SliverList.builder(
-                    itemCount: liked.length,
+                    itemCount: songs.length,
                     itemBuilder: (context, i) => ResponsiveListTile(
-                      item: liked[i],
-                      onTap: () => ref.read(playerActionsProvider).playList(liked, index: i, title: 'Liked music'),
+                      item: songs[i],
+                      onTap: () => ref.read(playerActionsProvider).playList(songs, index: i, title: 'Songs'),
                     ),
                   )
           else if (entries.isEmpty)

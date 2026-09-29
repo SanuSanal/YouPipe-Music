@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/account.dart';
+
 import '../../innertube/models.dart';
 import '../../providers.dart';
 import '../../ui/theme/ytm_theme.dart';
@@ -106,7 +108,7 @@ class _ArtistView extends ConsumerWidget {
                       ),
                       OutlinedButton(
                         onPressed: () {
-                          ref.read(libraryProvider).setSaved(artist, !subscribed);
+                          ref.read(accountActionsProvider).setSaved(artist, !subscribed, channelId: page.channelId);
                           showSnack(context, subscribed ? 'Unsubscribed' : 'Subscribed');
                         },
                         style: OutlinedButton.styleFrom(

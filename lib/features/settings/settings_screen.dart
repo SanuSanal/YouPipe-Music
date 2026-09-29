@@ -2,7 +2,11 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
+import '../../data/account.dart';
 import '../../data/stream_resolver.dart';
+import '../../ui/widgets/thumbnail.dart';
 import '../../providers.dart';
 import '../../ui/theme/ytm_theme.dart';
 import '../../ui/widgets/item_menu.dart';
@@ -100,6 +104,8 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          const _Header('Account'),
+          const _AccountTile(),
           const _Header('Playback'),
           ListTile(
             leading: const Icon(Icons.high_quality_outlined, color: YtmColors.textPrimary),
@@ -174,6 +180,46 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AccountTile extends ConsumerWidget {
+  const _AccountTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authProvider).value ?? const AuthState();
+    if (!auth.signedIn) {
+      return ListTile(
+        leading: const Icon(Icons.account_circle_outlined, color: YtmColors.textPrimary),
+        title: const Text('Sign in to YouTube Music'),
+        subtitle: const Text('Your library, likes and personalised recommendations'),
+        onTap: () async {
+          final ok = await context.push<bool>('/login');
+          if (ok == true && context.mounted) showSnack(context, 'Signed in');
+        },
+      );
+    }
+    final account = auth.account;
+    return Column(
+      children: [
+        ListTile(
+          leading: account == null || account.photos.isEmpty
+              ? const Icon(Icons.account_circle, color: YtmColors.textPrimary, size: 40)
+              : YtImage(thumbnails: account.photos, size: 40, circle: true),
+          title: Text(account?.name ?? 'Signed in'),
+          subtitle: Text(account?.email ?? account?.handle ?? 'YouTube Music account'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.logout, color: YtmColors.textPrimary),
+          title: const Text('Sign out'),
+          onTap: () async {
+            await ref.read(authProvider.notifier).signOut();
+            if (context.mounted) showSnack(context, 'Signed out');
+          },
+        ),
+      ],
     );
   }
 }

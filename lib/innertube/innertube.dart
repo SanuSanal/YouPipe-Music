@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'auth.dart';
 import 'clients.dart';
 import 'json_nav.dart';
 import 'models.dart';
@@ -53,6 +54,23 @@ class InnerTube {
   /// Anonymous session id. Without it YouTube serves degraded/generic responses.
   String? visitorData;
 
+  /// Google session cookie (from the sign-in WebView). When set, requests are authenticated.
+  String? cookie;
+
+  bool get signedIn => isSignedInCookie(cookie);
+
+  Map<String, String> _headers() {
+    final headers = _client.headers(visitorData: visitorData);
+    final c = cookie;
+    if (c != null && isSignedInCookie(c)) {
+      headers['Cookie'] = c;
+      headers['Authorization'] = sapisidHashHeader(c)!;
+      headers['X-Goog-AuthUser'] = '0';
+      headers['X-Origin'] = 'https://music.youtube.com';
+    }
+    return headers;
+  }
+
   static const _client = YouTubeClient.webRemix;
 
   Future<Json> _post(String endpoint, Json body) async {
@@ -64,7 +82,7 @@ class InnerTube {
           'context': _client.context(hl: hl, gl: gl, visitorData: visitorData),
           ...body,
         },
-        options: Options(headers: _client.headers(visitorData: visitorData)),
+        options: Options(headers: _headers()),
       );
       final data = res.data ?? const {};
       visitorData ??= nav<String>(data, ['responseContext', 'visitorData']);
@@ -150,6 +168,49 @@ class InnerTube {
   );
 
   Future<Lyrics?> lyrics(BrowseEndpoint endpoint) async => parseLyrics(await _browse(endpoint));
+
+  // Account (signed in) ------------------------------------------------------------------------
+
+  Future<AccountInfo?> accountInfo() async => parseAccountMenu(await _post('account/account_menu', const {}));
+
+  /// Library pages: playlists, albums, artists, liked songs.
+  Future<SectionsPage> library(LibraryPage page) async =>
+      parseSectionsPage(await _browse(BrowseEndpoint(page.browseId)));
+
+  Future<void> like(String videoId) => _post('like/like', {
+    'target': {'videoId': videoId},
+  });
+
+  Future<void> removeLike(String videoId) => _post('like/removelike', {
+    'target': {'videoId': videoId},
+  });
+
+  /// Saves/unsaves a playlist or album (by its playlist id) in the account library.
+  Future<void> savePlaylist(String playlistId, {bool save = true}) => _post(save ? 'like/like' : 'like/removelike', {
+    'target': {'playlistId': playlistId},
+  });
+
+  Future<void> subscribe(String channelId, {bool subscribe = true}) =>
+      _post(subscribe ? 'subscription/subscribe' : 'subscription/unsubscribe', {
+        'channelIds': [channelId],
+      });
+
+  /// Creates a private playlist; returns its id.
+  Future<String?> createPlaylist(String title, {List<String> videoIds = const []}) async {
+    final data = await _post('playlist/create', {
+      'title': title,
+      'privacyStatus': 'PRIVATE',
+      if (videoIds.isNotEmpty) 'videoIds': videoIds,
+    });
+    return data['playlistId'] as String?;
+  }
+
+  Future<void> addToPlaylist(String playlistId, List<String> videoIds) => _post('browse/edit_playlist', {
+    'playlistId': playlistId.startsWith('VL') ? playlistId.substring(2) : playlistId,
+    'actions': [
+      for (final id in videoIds) {'action': 'ACTION_ADD_VIDEO', 'addedVideoId': id},
+    ],
+  });
 
   Future<List<Section>> related(BrowseEndpoint endpoint) async => parseRelated(await _browse(endpoint));
 }

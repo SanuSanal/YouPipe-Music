@@ -1,6 +1,9 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/account.dart';
+
 import 'package:share_plus/share_plus.dart';
 
 import '../../innertube/models.dart';
@@ -33,7 +36,6 @@ class PlayerScreen extends ConsumerWidget {
     final size = MediaQuery.sizeOf(context);
     final artSize = (size.width - 48).clamp(200.0, size.height * 0.42);
     final liked = ref.watch(isLikedProvider(song.videoId)).value ?? false;
-    final library = ref.read(libraryProvider);
 
     return ArtworkTint(
       url: song.thumbnails.best(120),
@@ -118,7 +120,7 @@ class PlayerScreen extends ConsumerWidget {
                           _Pill(
                             icon: liked ? Icons.thumb_up : Icons.thumb_up_outlined,
                             label: liked ? 'Liked' : 'Like',
-                            onTap: () => library.setLiked(song, !liked),
+                            onTap: () => ref.read(accountActionsProvider).setLiked(song, !liked),
                           ),
                           _Pill(
                             icon: Icons.playlist_add,

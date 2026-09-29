@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/account.dart';
+
 import 'package:share_plus/share_plus.dart';
 
 import '../../innertube/models.dart';
@@ -74,7 +77,7 @@ class _PlaylistView extends ConsumerWidget {
               onShuffle: () async =>
                   actions.playList(await controller.allSongs(), shuffle: true, title: playlist.title),
               onSave: () {
-                ref.read(libraryProvider).setSaved(playlist, !saved);
+                ref.read(accountActionsProvider).setSaved(playlist, !saved);
                 showSnack(context, saved ? 'Removed from library' : 'Saved to library');
               },
               onShare: () => SharePlus.instance.share(ShareParams(text: shareUrl(playlist))),

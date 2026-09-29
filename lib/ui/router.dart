@@ -10,6 +10,7 @@ import '../features/library/library_screen.dart';
 import '../features/library/local_list_screens.dart';
 import '../features/playlist/playlist_screen.dart';
 import '../features/search/search_screen.dart';
+import '../features/settings/login_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../innertube/models.dart';
 import 'shell/app_shell.dart';
@@ -69,5 +70,6 @@ GoRouter buildRouter() => GoRouter(
       ],
     ),
     GoRoute(path: '/settings', parentNavigatorKey: _rootKey, builder: (_, _) => const SettingsScreen()),
+    GoRoute(path: '/login', parentNavigatorKey: _rootKey, builder: (_, _) => const LoginScreen()),
   ],
 );

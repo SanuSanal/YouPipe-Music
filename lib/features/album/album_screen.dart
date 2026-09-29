@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/account.dart';
+
 import 'package:share_plus/share_plus.dart';
 
 import '../../innertube/models.dart';
@@ -65,7 +68,7 @@ class _AlbumView extends ConsumerWidget {
             },
             onShuffle: () => actions.playList(page.songs, shuffle: true, title: album.title),
             onSave: () {
-              ref.read(libraryProvider).setSaved(album, !saved);
+              ref.read(accountActionsProvider).setSaved(album, !saved);
               showSnack(context, saved ? 'Removed from library' : 'Saved to library');
             },
             onShare: () => SharePlus.instance.share(ShareParams(text: shareUrl(album))),

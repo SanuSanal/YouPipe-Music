@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/account.dart';
+
 import 'package:share_plus/share_plus.dart';
 
 import '../../data/db/app_database.dart' show DownloadStatus;
@@ -60,7 +63,7 @@ class _ItemMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final saved = ref.watch(isSavedProvider(item)).value ?? false;
     final actions = ref.read(playerActionsProvider);
-    final library = ref.read(libraryProvider);
+    final account = ref.read(accountActionsProvider);
     final downloads = ref.read(downloadManagerProvider);
     final downloadStatus = item is SongItem ? ref.watch(downloadStatusProvider(item.id)) : null;
 
@@ -108,7 +111,7 @@ class _ItemMenu extends ConsumerWidget {
         _tile(
           saved ? Icons.thumb_up : Icons.thumb_up_outlined,
           saved ? 'Remove from liked songs' : 'Add to liked songs',
-          () => run(() => library.setLiked(song, !saved), saved ? 'Removed from liked songs' : 'Added to liked songs'),
+          () => run(() => account.setLiked(song, !saved), saved ? 'Removed from liked songs' : 'Added to liked songs'),
         ),
         _tile(Icons.playlist_add, 'Save to playlist', () {
           Navigator.of(context).pop();
@@ -164,7 +167,7 @@ class _ItemMenu extends ConsumerWidget {
           _tile(
             saved ? Icons.library_add_check : Icons.library_add_outlined,
             saved ? 'Remove from library' : 'Save to library',
-            () => run(() => library.setSaved(item, !saved), saved ? 'Removed from library' : 'Saved to library'),
+            () => run(() => account.setSaved(item, !saved), saved ? 'Removed from library' : 'Saved to library'),
           ),
           _tile(Icons.playlist_add, 'Save to playlist', () {
             Navigator.of(context).pop();
@@ -189,7 +192,7 @@ class _ItemMenu extends ConsumerWidget {
         _tile(
           saved ? Icons.how_to_reg : Icons.person_add_alt,
           saved ? 'Unsubscribe' : 'Subscribe',
-          () => run(() => library.setSaved(item, !saved), saved ? 'Unsubscribed' : 'Subscribed'),
+          () => run(() => account.setSaved(item, !saved), saved ? 'Unsubscribed' : 'Subscribed'),
         ),
       _tile(Icons.share_outlined, 'Share', () {
         Navigator.of(context).pop();
@@ -278,6 +281,25 @@ Future<void> showSaveToPlaylist(BuildContext context, WidgetRef ref, List<SongIt
                 child: ListView(
                   shrinkWrap: true,
                   children: [
+                    for (final p
+                        in ref.watch(accountLibraryProvider(LibraryPage.playlists)).value?.whereType<PlaylistItem>() ??
+                            const <PlaylistItem>[])
+                      // LM = Liked Music, SE = Episodes for later: not editable.
+                      if (p.id != 'LM' && p.id != 'SE' && !p.isRadio)
+                        ListTile(
+                          leading: YtImage(thumbnails: p.thumbnails, size: 48, fallbackIcon: Icons.queue_music),
+                          title: Text(p.title),
+                          subtitle: const Text('YouTube Music'),
+                          onTap: () async {
+                            try {
+                              await ref.read(innerTubeProvider).addToPlaylist(p.id, [for (final s in songs) s.videoId]);
+                              if (context.mounted) showSnack(context, 'Saved to ${p.title}');
+                            } catch (_) {
+                              if (context.mounted) showSnack(context, "Couldn't add to ${p.title}");
+                            }
+                            if (sheet.mounted) Navigator.of(sheet).pop();
+                          },
+                        ),
                     for (final p in playlists)
                       ListTile(
                         leading: YtImage.url(p.thumbnailUrl, size: 48, fallbackIcon: Icons.queue_music),

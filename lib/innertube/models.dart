@@ -318,6 +318,7 @@ class ArtistPage {
     required this.sections,
     this.description,
     this.subscriberCount,
+    this.channelId,
     this.monthlyAudience,
     this.shuffleEndpoint,
     this.radioEndpoint,
@@ -327,6 +328,9 @@ class ArtistPage {
   final List<Section> sections;
   final String? description;
   final String? subscriberCount;
+
+  /// Channel id to (un)subscribe (may differ from the artist browseId).
+  final String? channelId;
   final String? monthlyAudience;
   final WatchEndpoint? shuffleEndpoint;
   final WatchEndpoint? radioEndpoint;
@@ -373,6 +377,27 @@ class Lyrics {
 
   final String text;
   final String? source;
+}
+
+class AccountInfo {
+  const AccountInfo({required this.name, this.email, this.handle, this.photos = const []});
+
+  final String name;
+  final String? email;
+  final String? handle;
+  final List<Thumbnail> photos;
+}
+
+/// The signed-in library views (same browse ids as YouTube Music web).
+enum LibraryPage {
+  playlists('FEmusic_liked_playlists'),
+  songs('FEmusic_liked_videos'),
+  albums('FEmusic_liked_albums'),
+  artists('FEmusic_library_corpus_track_artists'),
+  subscriptions('FEmusic_library_corpus_artists');
+
+  const LibraryPage(this.browseId);
+  final String browseId;
 }
 
 class ExplorePage {

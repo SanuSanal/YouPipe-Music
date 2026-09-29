@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../data/account.dart';
 import '../navigation.dart';
+import 'thumbnail.dart';
 import '../theme/ytm_theme.dart';
 
 /// Cylinder badge + "YouPipe Music" wordmark (top-left of the app bar).
@@ -38,6 +40,7 @@ class TopBarActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final photos = ref.watch(authProvider).value?.account?.photos ?? const [];
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -45,11 +48,13 @@ class TopBarActions extends ConsumerWidget {
         IconButton(
           tooltip: 'Settings',
           onPressed: () => openSettings(context, ref),
-          icon: const CircleAvatar(
-            radius: 14,
-            backgroundColor: Color(0xFF5E35B1),
-            child: Icon(Icons.person, size: 18, color: Colors.white),
-          ),
+          icon: photos.isNotEmpty
+              ? YtImage(thumbnails: photos, size: 28, circle: true)
+              : const CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Color(0xFF5E35B1),
+                  child: Icon(Icons.person, size: 18, color: Colors.white),
+                ),
         ),
         const SizedBox(width: 4),
       ],

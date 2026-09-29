@@ -21,6 +21,11 @@ List<T> _items<T>(List<Json> wrappers, T? Function(Json) parse) => [
 // ---------------------------------------------------------------------------------------------
 
 Section? parseSection(Json wrapper) {
+  // Library pages wrap their grid/shelf in an itemSectionRenderer.
+  if (nav<Json>(wrapper, ['itemSectionRenderer', 'contents', 0]) case final Json inner
+      when inner['gridRenderer'] != null || inner['musicShelfRenderer'] != null) {
+    return parseSection(inner);
+  }
   final carousel = wrapper['musicCarouselShelfRenderer'] ?? wrapper['musicImmersiveCarouselShelfRenderer'];
   if (carousel is Json) {
     final header =
@@ -347,6 +352,7 @@ ArtistPage parseArtist(Json data, String browseId) {
     sections: parseSections(wrappers),
     description: description ?? textOf(header['description']),
     subscriberCount: textOf(nav(header, ['subscriptionButton', 'subscribeButtonRenderer', 'subscriberCountText'])),
+    channelId: nav<String>(header, ['subscriptionButton', 'subscribeButtonRenderer', 'channelId']),
     monthlyAudience: textOf(header['monthlyListenerCount']),
     shuffleEndpoint: parseWatchEndpoint(nav(header, ['playButton', 'buttonRenderer', 'navigationEndpoint'])),
     radioEndpoint: parseWatchEndpoint(nav(header, ['startRadioButton', 'buttonRenderer', 'navigationEndpoint'])),
@@ -419,6 +425,26 @@ Lyrics? parseLyrics(Json data) {
   final text = textOf(shelf?['description']);
   if (text == null || text.isEmpty) return null;
   return Lyrics(text: text.replaceAll('\r\n', '\n'), source: textOf(shelf?['footer']));
+}
+
+AccountInfo? parseAccountMenu(Json data) {
+  final header = nav<Json>(data, [
+    'actions',
+    0,
+    'openPopupAction',
+    'popup',
+    'multiPageMenuRenderer',
+    'header',
+    'activeAccountHeaderRenderer',
+  ]);
+  final name = textOf(header?['accountName']);
+  if (header == null || name == null) return null;
+  return AccountInfo(
+    name: name,
+    email: textOf(header['email']),
+    handle: textOf(header['channelHandle']),
+    photos: parseThumbnails(header['accountPhoto']),
+  );
 }
 
 List<Section> parseRelated(Json data) => parseSections(navList(data, ['contents', 'sectionListRenderer', 'contents']));

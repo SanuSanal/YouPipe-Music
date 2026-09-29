@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'data/account.dart';
 import 'data/db/app_database.dart';
 import 'data/download_manager.dart';
 import 'data/lyrics/lyrics_service.dart';
@@ -325,7 +326,10 @@ final browseSectionsProvider = FutureProvider.autoDispose.family<SectionsPage, B
   (ref, ep) => ref.watch(innerTubeProvider).browseSections(ep),
 );
 
-final exploreProvider = FutureProvider<ExplorePage>((ref) => ref.watch(innerTubeProvider).explore());
+final exploreProvider = FutureProvider<ExplorePage>((ref) async {
+  await ref.watch(authProvider.future);
+  return ref.watch(innerTubeProvider).explore();
+});
 
 final searchSuggestionsProvider = FutureProvider.autoDispose.family<SearchSuggestions, String>((ref, input) async {
   if (input.trim().isEmpty) return const SearchSuggestions(queries: [], items: []);
@@ -376,6 +380,7 @@ class HomeController extends AsyncNotifier<Paged<HomePage>> {
 
   @override
   Future<Paged<HomePage>> build() async {
+    await ref.watch(authProvider.future);
     final yt = ref.watch(innerTubeProvider);
     await yt.ensureVisitorData();
     final page = await yt.home(chip: _chip);
