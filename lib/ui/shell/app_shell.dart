@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/sponsorblock.dart';
 import '../../features/player/mini_player.dart';
 import '../../features/player/player_screen.dart';
 import '../../innertube/models.dart';
 import '../../providers.dart';
 import '../navigation.dart';
+import '../widgets/item_menu.dart' show showSnack;
 import '../theme/ytm_theme.dart';
 
 /// Bottom navigation + the player panel that expands from the mini player to full screen.
@@ -23,9 +26,19 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderStateMixin {
   late final _panel = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+  StreamSubscription<SkipSegment>? _skips;
+
+  @override
+  void initState() {
+    super.initState();
+    _skips = ref.read(audioHandlerProvider).skippedSegments.stream.listen((_) {
+      if (mounted) showSnack(context, 'Skipped non-music section');
+    });
+  }
 
   @override
   void dispose() {
+    _skips?.cancel();
     _panel.dispose();
     super.dispose();
   }

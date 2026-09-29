@@ -112,6 +112,14 @@ class SettingsScreen extends ConsumerWidget {
               (v) => controller.update(s.copyWith(quality: v)),
             ),
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.content_cut, color: YtmColors.textPrimary),
+            title: const Text('Skip non-music sections'),
+            subtitle: const Text('Skips intros, skits and outros in music videos (SponsorBlock)'),
+            value: s.skipNonMusic,
+            activeTrackColor: YtmColors.brandRed,
+            onChanged: (v) => controller.update(s.copyWith(skipNonMusic: v)),
+          ),
           const _Header('Content'),
           ListTile(
             leading: const Icon(Icons.public, color: YtmColors.textPrimary),

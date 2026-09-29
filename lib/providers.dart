@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/db/app_database.dart';
 import 'data/lyrics/lyrics_service.dart';
+import 'data/sponsorblock.dart';
 import 'data/library_repository.dart';
 import 'data/stream_resolver.dart';
 import 'innertube/innertube.dart';
@@ -22,6 +23,8 @@ final audioHandlerProvider = Provider<YouPipeAudioHandler>((ref) => throw Unimpl
 final databaseProvider = Provider<AppDatabase>((ref) => throw UnimplementedError('overridden in main'));
 final prefsProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError('overridden in main'));
 
+final sponsorBlockProvider = Provider<SponsorBlockService>((ref) => SponsorBlockService());
+
 final libraryProvider = Provider<LibraryRepository>((ref) => LibraryRepository(ref.watch(databaseProvider)));
 
 // ---------------------------------------------------------------------------------------------
@@ -30,19 +33,30 @@ final libraryProvider = Provider<LibraryRepository>((ref) => LibraryRepository(r
 
 @immutable
 class AppSettings {
-  const AppSettings({this.quality = AudioQuality.high, this.hl = 'en', this.gl = 'US', this.saveHistory = true});
+  const AppSettings({
+    this.quality = AudioQuality.high,
+    this.hl = 'en',
+    this.gl = 'US',
+    this.saveHistory = true,
+    this.skipNonMusic = true,
+  });
 
   final AudioQuality quality;
   final String hl;
   final String gl;
   final bool saveHistory;
 
-  AppSettings copyWith({AudioQuality? quality, String? hl, String? gl, bool? saveHistory}) => AppSettings(
-    quality: quality ?? this.quality,
-    hl: hl ?? this.hl,
-    gl: gl ?? this.gl,
-    saveHistory: saveHistory ?? this.saveHistory,
-  );
+  /// SponsorBlock: skip non-music sections of music videos.
+  final bool skipNonMusic;
+
+  AppSettings copyWith({AudioQuality? quality, String? hl, String? gl, bool? saveHistory, bool? skipNonMusic}) =>
+      AppSettings(
+        quality: quality ?? this.quality,
+        hl: hl ?? this.hl,
+        gl: gl ?? this.gl,
+        saveHistory: saveHistory ?? this.saveHistory,
+        skipNonMusic: skipNonMusic ?? this.skipNonMusic,
+      );
 }
 
 final settingsProvider = NotifierProvider<SettingsController, AppSettings>(SettingsController.new);
@@ -58,6 +72,7 @@ class SettingsController extends Notifier<AppSettings> {
       hl: p.getString('hl') ?? 'en',
       gl: p.getString('gl') ?? 'US',
       saveHistory: p.getBool('saveHistory') ?? true,
+      skipNonMusic: p.getBool('skipNonMusic') ?? true,
     );
     _apply(s);
     return s;
@@ -71,6 +86,8 @@ class SettingsController extends Notifier<AppSettings> {
       ..hl = s.hl
       ..gl = s.gl
       ..quality = s.quality;
+    final sponsorBlock = ref.read(sponsorBlockProvider);
+    ref.read(audioHandlerProvider).segmentLoader = s.skipNonMusic ? sponsorBlock.segmentsFor : null;
   }
 
   Future<void> update(AppSettings s) async {
@@ -80,6 +97,7 @@ class SettingsController extends Notifier<AppSettings> {
     await _prefs.setString('hl', s.hl);
     await _prefs.setString('gl', s.gl);
     await _prefs.setBool('saveHistory', s.saveHistory);
+    await _prefs.setBool('skipNonMusic', s.skipNonMusic);
   }
 }
 

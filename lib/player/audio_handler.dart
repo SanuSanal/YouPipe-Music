@@ -6,6 +6,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../data/sponsorblock.dart';
 import '../data/stream_resolver.dart';
 import '../innertube/models.dart';
 
@@ -18,6 +19,9 @@ class SleepTimer {
   final DateTime? endsAt;
   final bool endOfSong;
 }
+
+/// Returns the parts of a video to skip (SponsorBlock), or an empty list.
+typedef SegmentLoader = Future<List<SkipSegment>> Function(String videoId);
 
 /// Loads more songs for an endless queue (radio). Returns an empty list when exhausted.
 typedef QueueExtender = Future<List<SongItem>> Function();
@@ -61,6 +65,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     _player.processingStateStream.listen((s) {
       if (s == ProcessingState.completed) _onCompleted();
     });
+    _player.positionStream.listen(_skipSegments);
     _initSession();
   }
 
@@ -70,6 +75,13 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   final equalizer = AndroidEqualizer();
   final loudness = AndroidLoudnessEnhancer();
   late final _player = AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [loudness, equalizer]));
+
+  /// Set by the app when SponsorBlock is enabled; null disables skipping.
+  SegmentLoader? segmentLoader;
+  List<SkipSegment> _segments = const [];
+
+  /// Emits when a non-music section was skipped (for a toast).
+  final skippedSegments = StreamController<SkipSegment>.broadcast();
 
   /// When playback will stop, if a sleep timer is set.
   final sleepTimer = ValueNotifier<SleepTimer?>(null);
@@ -229,6 +241,15 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       );
       if (gen != _loadGeneration) return;
       if (duration != null) mediaItem.add(toMediaItem(song).copyWith(duration: duration));
+      _segments = const [];
+      final loader = segmentLoader;
+      if (loader != null) {
+        unawaited(
+          loader(song.videoId).then((segs) {
+            if (gen == _loadGeneration) _segments = segs;
+          }, onError: (_) {}),
+        );
+      }
       _prefetchNext();
       await _player.play();
     } catch (e) {
@@ -240,6 +261,23 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
           errorMessage: e is StreamResolveException ? e.message : '$e',
         ),
       );
+    }
+  }
+
+  void _skipSegments(Duration position) {
+    if (_segments.isEmpty || !_player.playing) return;
+    for (final seg in _segments) {
+      if (!seg.contains(position)) continue;
+      skippedSegments.add(seg);
+      final duration = _player.duration;
+      // A segment running to the end means the song is over.
+      if (duration != null && seg.end >= duration - const Duration(seconds: 1)) {
+        _segments = const [];
+        _onCompleted();
+      } else {
+        _player.seek(seg.end);
+      }
+      return;
     }
   }
 
