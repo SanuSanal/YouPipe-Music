@@ -16,6 +16,7 @@ These docs record the architecture and the decisions a new session needs in orde
 | [testing.md](testing.md) | tests, fixtures, running on a device |
 | [release.md](release.md) | the release workflow, signing, R8 keep rules, `android/app/build.gradle.kts` |
 | [updates.md](updates.md) | the in-app updater: GitHub check, download, install, `UpdateChannel.kt` |
+| [site.md](site.md) | the website in `site/` and its GitHub Pages workflow |
 | [roadmap.md](roadmap.md) | what's done, what's next, known issues |
 
 Docs describe the **current** state. When code changes a documented behaviour, update the doc in the same change (see `/AGENTS.md`).
