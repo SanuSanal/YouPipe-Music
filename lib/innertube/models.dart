@@ -21,7 +21,7 @@ extension ThumbnailList on List<Thumbnail> {
   String? best(int size) {
     if (isEmpty) return null;
     final largest = reduce((a, b) => (a.width ?? 0) >= (b.width ?? 0) ? a : b);
-    // Video thumbnails (i.ytimg.com) can't be resized through the URL.
+    // Local files and video thumbnails (i.ytimg.com) can't be resized through the URL.
     return largest.url.contains('googleusercontent.com') ? largest.sized(size) : largest.url;
   }
 }

@@ -20,6 +20,9 @@ class SleepTimer {
   final bool endOfSong;
 }
 
+/// Path of a downloaded copy of a song, or null.
+typedef LocalFileLookup = Future<String?> Function(String videoId);
+
 /// Returns the parts of a video to skip (SponsorBlock), or an empty list.
 typedef SegmentLoader = Future<List<SkipSegment>> Function(String videoId);
 
@@ -76,6 +79,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   final loudness = AndroidLoudnessEnhancer();
   late final _player = AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [loudness, equalizer]));
 
+  /// Offline copies are played instead of streaming when available.
+  LocalFileLookup? localFile;
+
   /// Set by the app when SponsorBlock is enabled; null disables skipping.
   SegmentLoader? segmentLoader;
   List<SkipSegment> _segments = const [];
@@ -115,6 +121,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     album: s.album?.name,
     duration: s.duration,
     artUri: switch (s.thumbnails.best(544)) {
+      final url? when url.startsWith('/') => Uri.file(url),
       final url? => Uri.parse(url),
       null => null,
     },
@@ -233,12 +240,17 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     unawaited(_maybeExtend());
 
     try {
-      final stream = await _resolver.resolve(song.videoId, forceRefresh: forceRefresh);
+      final local = await localFile?.call(song.videoId);
       if (gen != _loadGeneration) return;
-      final duration = await _player.setAudioSource(
-        AudioSource.uri(Uri.parse(stream.url), tag: song.videoId),
-        initialPosition: position,
-      );
+      final AudioSource source;
+      if (local != null) {
+        source = AudioSource.file(local, tag: song.videoId);
+      } else {
+        final stream = await _resolver.resolve(song.videoId, forceRefresh: forceRefresh);
+        if (gen != _loadGeneration) return;
+        source = AudioSource.uri(Uri.parse(stream.url), tag: song.videoId);
+      }
+      final duration = await _player.setAudioSource(source, initialPosition: position);
       if (gen != _loadGeneration) return;
       if (duration != null) mediaItem.add(toMediaItem(song).copyWith(duration: duration));
       _segments = const [];

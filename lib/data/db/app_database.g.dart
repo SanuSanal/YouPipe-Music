@@ -2421,6 +2421,396 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   }
 }
 
+class $DownloadsTable extends Downloads with TableInfo<$DownloadsTable, Download> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DownloadsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _videoIdMeta = const VerificationMeta('videoId');
+  @override
+  late final GeneratedColumn<String> videoId = GeneratedColumn<String>(
+    'video_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('REFERENCES songs (video_id)'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DownloadStatus, int> status = GeneratedColumn<int>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  ).withConverter<DownloadStatus>($DownloadsTable.$converterstatus);
+  static const VerificationMeta _filePathMeta = const VerificationMeta('filePath');
+  @override
+  late final GeneratedColumn<String> filePath = GeneratedColumn<String>(
+    'file_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _artPathMeta = const VerificationMeta('artPath');
+  @override
+  late final GeneratedColumn<String> artPath = GeneratedColumn<String>(
+    'art_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sizeBytesMeta = const VerificationMeta('sizeBytes');
+  @override
+  late final GeneratedColumn<int> sizeBytes = GeneratedColumn<int>(
+    'size_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _downloadedBytesMeta = const VerificationMeta('downloadedBytes');
+  @override
+  late final GeneratedColumn<int> downloadedBytes = GeneratedColumn<int>(
+    'downloaded_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _addedAtMeta = const VerificationMeta('addedAt');
+  @override
+  late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
+    'added_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [videoId, status, filePath, artPath, sizeBytes, downloadedBytes, addedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'downloads';
+  @override
+  VerificationContext validateIntegrity(Insertable<Download> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('video_id')) {
+      context.handle(_videoIdMeta, videoId.isAcceptableOrUnknown(data['video_id']!, _videoIdMeta));
+    } else if (isInserting) {
+      context.missing(_videoIdMeta);
+    }
+    if (data.containsKey('file_path')) {
+      context.handle(_filePathMeta, filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta));
+    }
+    if (data.containsKey('art_path')) {
+      context.handle(_artPathMeta, artPath.isAcceptableOrUnknown(data['art_path']!, _artPathMeta));
+    }
+    if (data.containsKey('size_bytes')) {
+      context.handle(_sizeBytesMeta, sizeBytes.isAcceptableOrUnknown(data['size_bytes']!, _sizeBytesMeta));
+    }
+    if (data.containsKey('downloaded_bytes')) {
+      context.handle(
+        _downloadedBytesMeta,
+        downloadedBytes.isAcceptableOrUnknown(data['downloaded_bytes']!, _downloadedBytesMeta),
+      );
+    }
+    if (data.containsKey('added_at')) {
+      context.handle(_addedAtMeta, addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta));
+    } else if (isInserting) {
+      context.missing(_addedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {videoId};
+  @override
+  Download map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Download(
+      videoId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}video_id'])!,
+      status: $DownloadsTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}status'])!,
+      ),
+      filePath: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}file_path']),
+      artPath: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}art_path']),
+      sizeBytes: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}size_bytes'])!,
+      downloadedBytes: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}downloaded_bytes'])!,
+      addedAt: attachedDatabase.typeMapping.read(DriftSqlType.dateTime, data['${effectivePrefix}added_at'])!,
+    );
+  }
+
+  @override
+  $DownloadsTable createAlias(String alias) {
+    return $DownloadsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<DownloadStatus, int, int> $converterstatus = const EnumIndexConverter<DownloadStatus>(
+    DownloadStatus.values,
+  );
+}
+
+class Download extends DataClass implements Insertable<Download> {
+  final String videoId;
+  final DownloadStatus status;
+  final String? filePath;
+  final String? artPath;
+  final int sizeBytes;
+  final int downloadedBytes;
+  final DateTime addedAt;
+  const Download({
+    required this.videoId,
+    required this.status,
+    this.filePath,
+    this.artPath,
+    required this.sizeBytes,
+    required this.downloadedBytes,
+    required this.addedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['video_id'] = Variable<String>(videoId);
+    {
+      map['status'] = Variable<int>($DownloadsTable.$converterstatus.toSql(status));
+    }
+    if (!nullToAbsent || filePath != null) {
+      map['file_path'] = Variable<String>(filePath);
+    }
+    if (!nullToAbsent || artPath != null) {
+      map['art_path'] = Variable<String>(artPath);
+    }
+    map['size_bytes'] = Variable<int>(sizeBytes);
+    map['downloaded_bytes'] = Variable<int>(downloadedBytes);
+    map['added_at'] = Variable<DateTime>(addedAt);
+    return map;
+  }
+
+  DownloadsCompanion toCompanion(bool nullToAbsent) {
+    return DownloadsCompanion(
+      videoId: Value(videoId),
+      status: Value(status),
+      filePath: filePath == null && nullToAbsent ? const Value.absent() : Value(filePath),
+      artPath: artPath == null && nullToAbsent ? const Value.absent() : Value(artPath),
+      sizeBytes: Value(sizeBytes),
+      downloadedBytes: Value(downloadedBytes),
+      addedAt: Value(addedAt),
+    );
+  }
+
+  factory Download.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Download(
+      videoId: serializer.fromJson<String>(json['videoId']),
+      status: $DownloadsTable.$converterstatus.fromJson(serializer.fromJson<int>(json['status'])),
+      filePath: serializer.fromJson<String?>(json['filePath']),
+      artPath: serializer.fromJson<String?>(json['artPath']),
+      sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
+      downloadedBytes: serializer.fromJson<int>(json['downloadedBytes']),
+      addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'videoId': serializer.toJson<String>(videoId),
+      'status': serializer.toJson<int>($DownloadsTable.$converterstatus.toJson(status)),
+      'filePath': serializer.toJson<String?>(filePath),
+      'artPath': serializer.toJson<String?>(artPath),
+      'sizeBytes': serializer.toJson<int>(sizeBytes),
+      'downloadedBytes': serializer.toJson<int>(downloadedBytes),
+      'addedAt': serializer.toJson<DateTime>(addedAt),
+    };
+  }
+
+  Download copyWith({
+    String? videoId,
+    DownloadStatus? status,
+    Value<String?> filePath = const Value.absent(),
+    Value<String?> artPath = const Value.absent(),
+    int? sizeBytes,
+    int? downloadedBytes,
+    DateTime? addedAt,
+  }) => Download(
+    videoId: videoId ?? this.videoId,
+    status: status ?? this.status,
+    filePath: filePath.present ? filePath.value : this.filePath,
+    artPath: artPath.present ? artPath.value : this.artPath,
+    sizeBytes: sizeBytes ?? this.sizeBytes,
+    downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+    addedAt: addedAt ?? this.addedAt,
+  );
+  Download copyWithCompanion(DownloadsCompanion data) {
+    return Download(
+      videoId: data.videoId.present ? data.videoId.value : this.videoId,
+      status: data.status.present ? data.status.value : this.status,
+      filePath: data.filePath.present ? data.filePath.value : this.filePath,
+      artPath: data.artPath.present ? data.artPath.value : this.artPath,
+      sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
+      downloadedBytes: data.downloadedBytes.present ? data.downloadedBytes.value : this.downloadedBytes,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Download(')
+          ..write('videoId: $videoId, ')
+          ..write('status: $status, ')
+          ..write('filePath: $filePath, ')
+          ..write('artPath: $artPath, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('downloadedBytes: $downloadedBytes, ')
+          ..write('addedAt: $addedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(videoId, status, filePath, artPath, sizeBytes, downloadedBytes, addedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Download &&
+          other.videoId == this.videoId &&
+          other.status == this.status &&
+          other.filePath == this.filePath &&
+          other.artPath == this.artPath &&
+          other.sizeBytes == this.sizeBytes &&
+          other.downloadedBytes == this.downloadedBytes &&
+          other.addedAt == this.addedAt);
+}
+
+class DownloadsCompanion extends UpdateCompanion<Download> {
+  final Value<String> videoId;
+  final Value<DownloadStatus> status;
+  final Value<String?> filePath;
+  final Value<String?> artPath;
+  final Value<int> sizeBytes;
+  final Value<int> downloadedBytes;
+  final Value<DateTime> addedAt;
+  final Value<int> rowid;
+  const DownloadsCompanion({
+    this.videoId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.filePath = const Value.absent(),
+    this.artPath = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.downloadedBytes = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DownloadsCompanion.insert({
+    required String videoId,
+    required DownloadStatus status,
+    this.filePath = const Value.absent(),
+    this.artPath = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.downloadedBytes = const Value.absent(),
+    required DateTime addedAt,
+    this.rowid = const Value.absent(),
+  }) : videoId = Value(videoId),
+       status = Value(status),
+       addedAt = Value(addedAt);
+  static Insertable<Download> custom({
+    Expression<String>? videoId,
+    Expression<int>? status,
+    Expression<String>? filePath,
+    Expression<String>? artPath,
+    Expression<int>? sizeBytes,
+    Expression<int>? downloadedBytes,
+    Expression<DateTime>? addedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (videoId != null) 'video_id': videoId,
+      if (status != null) 'status': status,
+      if (filePath != null) 'file_path': filePath,
+      if (artPath != null) 'art_path': artPath,
+      if (sizeBytes != null) 'size_bytes': sizeBytes,
+      if (downloadedBytes != null) 'downloaded_bytes': downloadedBytes,
+      if (addedAt != null) 'added_at': addedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DownloadsCompanion copyWith({
+    Value<String>? videoId,
+    Value<DownloadStatus>? status,
+    Value<String?>? filePath,
+    Value<String?>? artPath,
+    Value<int>? sizeBytes,
+    Value<int>? downloadedBytes,
+    Value<DateTime>? addedAt,
+    Value<int>? rowid,
+  }) {
+    return DownloadsCompanion(
+      videoId: videoId ?? this.videoId,
+      status: status ?? this.status,
+      filePath: filePath ?? this.filePath,
+      artPath: artPath ?? this.artPath,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+      addedAt: addedAt ?? this.addedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (videoId.present) {
+      map['video_id'] = Variable<String>(videoId.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<int>($DownloadsTable.$converterstatus.toSql(status.value));
+    }
+    if (filePath.present) {
+      map['file_path'] = Variable<String>(filePath.value);
+    }
+    if (artPath.present) {
+      map['art_path'] = Variable<String>(artPath.value);
+    }
+    if (sizeBytes.present) {
+      map['size_bytes'] = Variable<int>(sizeBytes.value);
+    }
+    if (downloadedBytes.present) {
+      map['downloaded_bytes'] = Variable<int>(downloadedBytes.value);
+    }
+    if (addedAt.present) {
+      map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadsCompanion(')
+          ..write('videoId: $videoId, ')
+          ..write('status: $status, ')
+          ..write('filePath: $filePath, ')
+          ..write('artPath: $artPath, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('downloadedBytes: $downloadedBytes, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2433,6 +2823,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LocalPlaylistsTable localPlaylists = $LocalPlaylistsTable(this);
   late final $LocalPlaylistItemsTable localPlaylistItems = $LocalPlaylistItemsTable(this);
   late final $SearchHistoryTable searchHistory = $SearchHistoryTable(this);
+  late final $DownloadsTable downloads = $DownloadsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
@@ -2446,6 +2837,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     localPlaylists,
     localPlaylistItems,
     searchHistory,
+    downloads,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2522,6 +2914,19 @@ final class $$SongsTableReferences extends BaseReferences<_$AppDatabase, $SongsT
     ).filter((f) => f.videoId.videoId.sqlEquals($_itemColumn<String>('video_id')!));
 
     final cache = $_typedResult.readTableOrNull(_localPlaylistItemsRefsTable($_db));
+    return ProcessedTableManager(manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$DownloadsTable, List<Download>> _downloadsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.downloads, aliasName: 'songs__video_id__downloads__video_id');
+
+  $$DownloadsTableProcessedTableManager get downloadsRefs {
+    final manager = $$DownloadsTableTableManager(
+      $_db,
+      $_db.downloads,
+    ).filter((f) => f.videoId.videoId.sqlEquals($_itemColumn<String>('video_id')!));
+
+    final cache = $_typedResult.readTableOrNull(_downloadsRefsTable($_db));
     return ProcessedTableManager(manager.$state.copyWith(prefetchedData: cache));
   }
 }
@@ -2604,6 +3009,24 @@ class $$SongsTableFilterComposer extends Composer<_$AppDatabase, $SongsTable> {
           $$LocalPlaylistItemsTableFilterComposer(
             $db: $db,
             $table: $db.localPlaylistItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer: $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> downloadsRefs(Expression<bool> Function($$DownloadsTableFilterComposer f) f) {
+    final $$DownloadsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.videoId,
+      referencedTable: $db.downloads,
+      getReferencedColumn: (t) => t.videoId,
+      builder: (joinBuilder, {$addJoinBuilderToRootComposer, $removeJoinBuilderFromRootComposer}) =>
+          $$DownloadsTableFilterComposer(
+            $db: $db,
+            $table: $db.downloads,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer: $removeJoinBuilderFromRootComposer,
@@ -2727,6 +3150,24 @@ class $$SongsTableAnnotationComposer extends Composer<_$AppDatabase, $SongsTable
     );
     return f(composer);
   }
+
+  Expression<T> downloadsRefs<T extends Object>(Expression<T> Function($$DownloadsTableAnnotationComposer a) f) {
+    final $$DownloadsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.videoId,
+      referencedTable: $db.downloads,
+      getReferencedColumn: (t) => t.videoId,
+      builder: (joinBuilder, {$addJoinBuilderToRootComposer, $removeJoinBuilderFromRootComposer}) =>
+          $$DownloadsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.downloads,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer: $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$SongsTableTableManager
@@ -2742,7 +3183,12 @@ class $$SongsTableTableManager
           $$SongsTableUpdateCompanionBuilder,
           (Song, $$SongsTableReferences),
           Song,
-          PrefetchHooks Function({bool likedSongsRefs, bool playHistoryRefs, bool localPlaylistItemsRefs})
+          PrefetchHooks Function({
+            bool likedSongsRefs,
+            bool playHistoryRefs,
+            bool localPlaylistItemsRefs,
+            bool downloadsRefs,
+          })
         > {
   $$SongsTableTableManager(_$AppDatabase db, $SongsTable table)
     : super(
@@ -2798,48 +3244,64 @@ class $$SongsTableTableManager
               ),
           withReferenceMapper: (p0) =>
               p0.map((e) => (e.readTable<$SongsTable, Song>(table), $$SongsTableReferences(db, table, e))).toList(),
-          prefetchHooksCallback: ({likedSongsRefs = false, playHistoryRefs = false, localPlaylistItemsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (likedSongsRefs) db.likedSongs,
-                if (playHistoryRefs) db.playHistory,
-                if (localPlaylistItemsRefs) db.localPlaylistItems,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (likedSongsRefs)
-                    await $_getPrefetchedData<Song, $SongsTable, LikedSong>(
-                      currentTable: table,
-                      referencedTable: $$SongsTableReferences._likedSongsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).likedSongsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.videoId == item.videoId),
-                      typedResults: items,
-                    ),
-                  if (playHistoryRefs)
-                    await $_getPrefetchedData<Song, $SongsTable, PlayHistoryData>(
-                      currentTable: table,
-                      referencedTable: $$SongsTableReferences._playHistoryRefsTable(db),
-                      managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).playHistoryRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.videoId == item.videoId),
-                      typedResults: items,
-                    ),
-                  if (localPlaylistItemsRefs)
-                    await $_getPrefetchedData<Song, $SongsTable, LocalPlaylistItem>(
-                      currentTable: table,
-                      referencedTable: $$SongsTableReferences._localPlaylistItemsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).localPlaylistItemsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.videoId == item.videoId),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                likedSongsRefs = false,
+                playHistoryRefs = false,
+                localPlaylistItemsRefs = false,
+                downloadsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (likedSongsRefs) db.likedSongs,
+                    if (playHistoryRefs) db.playHistory,
+                    if (localPlaylistItemsRefs) db.localPlaylistItems,
+                    if (downloadsRefs) db.downloads,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (likedSongsRefs)
+                        await $_getPrefetchedData<Song, $SongsTable, LikedSong>(
+                          currentTable: table,
+                          referencedTable: $$SongsTableReferences._likedSongsRefsTable(db),
+                          managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).likedSongsRefs,
+                          referencedItemsForCurrentItem: (item, referencedItems) =>
+                              referencedItems.where((e) => e.videoId == item.videoId),
+                          typedResults: items,
+                        ),
+                      if (playHistoryRefs)
+                        await $_getPrefetchedData<Song, $SongsTable, PlayHistoryData>(
+                          currentTable: table,
+                          referencedTable: $$SongsTableReferences._playHistoryRefsTable(db),
+                          managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).playHistoryRefs,
+                          referencedItemsForCurrentItem: (item, referencedItems) =>
+                              referencedItems.where((e) => e.videoId == item.videoId),
+                          typedResults: items,
+                        ),
+                      if (localPlaylistItemsRefs)
+                        await $_getPrefetchedData<Song, $SongsTable, LocalPlaylistItem>(
+                          currentTable: table,
+                          referencedTable: $$SongsTableReferences._localPlaylistItemsRefsTable(db),
+                          managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).localPlaylistItemsRefs,
+                          referencedItemsForCurrentItem: (item, referencedItems) =>
+                              referencedItems.where((e) => e.videoId == item.videoId),
+                          typedResults: items,
+                        ),
+                      if (downloadsRefs)
+                        await $_getPrefetchedData<Song, $SongsTable, Download>(
+                          currentTable: table,
+                          referencedTable: $$SongsTableReferences._downloadsRefsTable(db),
+                          managerFromTypedResult: (p0) => $$SongsTableReferences(db, table, p0).downloadsRefs,
+                          referencedItemsForCurrentItem: (item, referencedItems) =>
+                              referencedItems.where((e) => e.videoId == item.videoId),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -2856,7 +3318,12 @@ typedef $$SongsTableProcessedTableManager =
       $$SongsTableUpdateCompanionBuilder,
       (Song, $$SongsTableReferences),
       Song,
-      PrefetchHooks Function({bool likedSongsRefs, bool playHistoryRefs, bool localPlaylistItemsRefs})
+      PrefetchHooks Function({
+        bool likedSongsRefs,
+        bool playHistoryRefs,
+        bool localPlaylistItemsRefs,
+        bool downloadsRefs,
+      })
     >;
 typedef $$LikedSongsTableCreateCompanionBuilder = LikedSongsCompanion Function({
   required String videoId,
@@ -4412,6 +4879,293 @@ typedef $$SearchHistoryTableProcessedTableManager =
       SearchHistoryData,
       PrefetchHooks Function()
     >;
+typedef $$DownloadsTableCreateCompanionBuilder = DownloadsCompanion Function({
+  required String videoId,
+  required DownloadStatus status,
+  Value<String?> filePath,
+  Value<String?> artPath,
+  Value<int> sizeBytes,
+  Value<int> downloadedBytes,
+  required DateTime addedAt,
+  Value<int> rowid,
+});
+typedef $$DownloadsTableUpdateCompanionBuilder = DownloadsCompanion Function({
+  Value<String> videoId,
+  Value<DownloadStatus> status,
+  Value<String?> filePath,
+  Value<String?> artPath,
+  Value<int> sizeBytes,
+  Value<int> downloadedBytes,
+  Value<DateTime> addedAt,
+  Value<int> rowid,
+});
+
+final class $$DownloadsTableReferences extends BaseReferences<_$AppDatabase, $DownloadsTable, Download> {
+  $$DownloadsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $SongsTable _videoIdTable(_$AppDatabase db) => db.songs.createAlias('downloads__video_id__songs__video_id');
+
+  $$SongsTableProcessedTableManager get videoId {
+    final $_column = $_itemColumn<String>('video_id')!;
+
+    final manager = $$SongsTableTableManager($_db, $_db.songs).filter((f) => f.videoId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_videoIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$DownloadsTableFilterComposer extends Composer<_$AppDatabase, $DownloadsTable> {
+  $$DownloadsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DownloadStatus, DownloadStatus, int> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => ColumnWithTypeConverterFilters(column));
+
+  ColumnFilters<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get artPath =>
+      $composableBuilder(column: $table.artPath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sizeBytes =>
+      $composableBuilder(column: $table.sizeBytes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get downloadedBytes =>
+      $composableBuilder(column: $table.downloadedBytes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => ColumnFilters(column));
+
+  $$SongsTableFilterComposer get videoId {
+    final $$SongsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.videoId,
+      referencedTable: $db.songs,
+      getReferencedColumn: (t) => t.videoId,
+      builder: (joinBuilder, {$addJoinBuilderToRootComposer, $removeJoinBuilderFromRootComposer}) =>
+          $$SongsTableFilterComposer(
+            $db: $db,
+            $table: $db.songs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer: $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DownloadsTableOrderingComposer extends Composer<_$AppDatabase, $DownloadsTable> {
+  $$DownloadsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get artPath =>
+      $composableBuilder(column: $table.artPath, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sizeBytes =>
+      $composableBuilder(column: $table.sizeBytes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get downloadedBytes =>
+      $composableBuilder(column: $table.downloadedBytes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => ColumnOrderings(column));
+
+  $$SongsTableOrderingComposer get videoId {
+    final $$SongsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.videoId,
+      referencedTable: $db.songs,
+      getReferencedColumn: (t) => t.videoId,
+      builder: (joinBuilder, {$addJoinBuilderToRootComposer, $removeJoinBuilderFromRootComposer}) =>
+          $$SongsTableOrderingComposer(
+            $db: $db,
+            $table: $db.songs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer: $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DownloadsTableAnnotationComposer extends Composer<_$AppDatabase, $DownloadsTable> {
+  $$DownloadsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DownloadStatus, int> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get filePath => $composableBuilder(column: $table.filePath, builder: (column) => column);
+
+  GeneratedColumn<String> get artPath => $composableBuilder(column: $table.artPath, builder: (column) => column);
+
+  GeneratedColumn<int> get sizeBytes => $composableBuilder(column: $table.sizeBytes, builder: (column) => column);
+
+  GeneratedColumn<int> get downloadedBytes =>
+      $composableBuilder(column: $table.downloadedBytes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get addedAt => $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  $$SongsTableAnnotationComposer get videoId {
+    final $$SongsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.videoId,
+      referencedTable: $db.songs,
+      getReferencedColumn: (t) => t.videoId,
+      builder: (joinBuilder, {$addJoinBuilderToRootComposer, $removeJoinBuilderFromRootComposer}) =>
+          $$SongsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.songs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer: $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DownloadsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DownloadsTable,
+          Download,
+          $$DownloadsTableFilterComposer,
+          $$DownloadsTableOrderingComposer,
+          $$DownloadsTableAnnotationComposer,
+          $$DownloadsTableCreateCompanionBuilder,
+          $$DownloadsTableUpdateCompanionBuilder,
+          (Download, $$DownloadsTableReferences),
+          Download,
+          PrefetchHooks Function({bool videoId})
+        > {
+  $$DownloadsTableTableManager(_$AppDatabase db, $DownloadsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$DownloadsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$DownloadsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$DownloadsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> videoId = const Value.absent(),
+                Value<DownloadStatus> status = const Value.absent(),
+                Value<String?> filePath = const Value.absent(),
+                Value<String?> artPath = const Value.absent(),
+                Value<int> sizeBytes = const Value.absent(),
+                Value<int> downloadedBytes = const Value.absent(),
+                Value<DateTime> addedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadsCompanion(
+                videoId: videoId,
+                status: status,
+                filePath: filePath,
+                artPath: artPath,
+                sizeBytes: sizeBytes,
+                downloadedBytes: downloadedBytes,
+                addedAt: addedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String videoId,
+                required DownloadStatus status,
+                Value<String?> filePath = const Value.absent(),
+                Value<String?> artPath = const Value.absent(),
+                Value<int> sizeBytes = const Value.absent(),
+                Value<int> downloadedBytes = const Value.absent(),
+                required DateTime addedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadsCompanion.insert(
+                videoId: videoId,
+                status: status,
+                filePath: filePath,
+                artPath: artPath,
+                sizeBytes: sizeBytes,
+                downloadedBytes: downloadedBytes,
+                addedAt: addedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable<$DownloadsTable, Download>(table), $$DownloadsTableReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: ({videoId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (videoId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.videoId,
+                        referencedTable: $$DownloadsTableReferences._videoIdTable(db),
+                        referencedColumn: $$DownloadsTableReferences._videoIdTable(db).videoId,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DownloadsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DownloadsTable,
+      Download,
+      $$DownloadsTableFilterComposer,
+      $$DownloadsTableOrderingComposer,
+      $$DownloadsTableAnnotationComposer,
+      $$DownloadsTableCreateCompanionBuilder,
+      $$DownloadsTableUpdateCompanionBuilder,
+      (Download, $$DownloadsTableReferences),
+      Download,
+      PrefetchHooks Function({bool videoId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4426,4 +5180,5 @@ class $AppDatabaseManager {
   $$LocalPlaylistItemsTableTableManager get localPlaylistItems =>
       $$LocalPlaylistItemsTableTableManager(_db, _db.localPlaylistItems);
   $$SearchHistoryTableTableManager get searchHistory => $$SearchHistoryTableTableManager(_db, _db.searchHistory);
+  $$DownloadsTableTableManager get downloads => $$DownloadsTableTableManager(_db, _db.downloads);
 }

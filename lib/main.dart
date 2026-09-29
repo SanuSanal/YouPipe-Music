@@ -59,10 +59,17 @@ class _YouPipeAppState extends ConsumerState<YouPipeApp> {
   final _router = buildRouter();
 
   @override
+  void initState() {
+    super.initState();
+    ref.read(downloadManagerProvider).resumePending();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Applies saved region/language/quality to the services on startup.
     ref.watch(settingsProvider);
     ref.watch(audioEffectsProvider);
+    ref.watch(downloadManagerProvider);
     return MaterialApp.router(
       title: 'YouPipe Music',
       debugShowCheckedModeBanner: false,

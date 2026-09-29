@@ -203,6 +203,14 @@ class _EqualizerSheet extends ConsumerWidget {
                           child: ChoiceChip(
                             label: Text(name),
                             selected: fx.preset == name,
+                            showCheckmark: false,
+                            selectedColor: YtmColors.chipSelected,
+                            backgroundColor: YtmColors.chip,
+                            side: BorderSide.none,
+                            labelStyle: TextStyle(
+                              color: fx.preset == name ? Colors.black : YtmColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
                             onSelected: (_) {
                               final curve = eqPresets[name]!;
                               final gains = [

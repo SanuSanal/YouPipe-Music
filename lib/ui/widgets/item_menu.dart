@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../data/db/app_database.dart' show DownloadStatus;
 import '../../innertube/models.dart';
 import '../../providers.dart';
 import '../navigation.dart';
@@ -60,6 +61,8 @@ class _ItemMenu extends ConsumerWidget {
     final saved = ref.watch(isSavedProvider(item)).value ?? false;
     final actions = ref.read(playerActionsProvider);
     final library = ref.read(libraryProvider);
+    final downloads = ref.read(downloadManagerProvider);
+    final downloadStatus = item is SongItem ? ref.watch(downloadStatusProvider(item.id)) : null;
 
     void run(Future<void> Function() action, [String? toast]) {
       Navigator.of(context).pop();
@@ -111,6 +114,14 @@ class _ItemMenu extends ConsumerWidget {
           Navigator.of(context).pop();
           showSaveToPlaylist(hostContext, ref, [song]);
         }),
+        if (downloadStatus == null || downloadStatus == DownloadStatus.failed)
+          _tile(Icons.download_outlined, 'Download', () => run(() => downloads.enqueue([song]), 'Downloading…'))
+        else
+          _tile(
+            downloadStatus == DownloadStatus.done ? Icons.download_done : Icons.downloading,
+            downloadStatus == DownloadStatus.done ? 'Remove download' : 'Cancel download',
+            () => run(() => downloads.remove(song.videoId), 'Download removed'),
+          ),
         if (song.album != null)
           _tile(Icons.album_outlined, 'Go to album', () {
             Navigator.of(context).pop();
@@ -161,6 +172,11 @@ class _ItemMenu extends ConsumerWidget {
               if (hostContext.mounted) showSaveToPlaylist(hostContext, ref, songs);
             });
           }),
+          _tile(
+            Icons.download_outlined,
+            'Download',
+            () => run(() async => downloads.enqueue(await _songsOf(ref, item)), 'Downloading…'),
+          ),
         ],
         if (item case AlbumItem(:final artists))
           for (final artist in artists.where((a) => a.id != null).take(1))

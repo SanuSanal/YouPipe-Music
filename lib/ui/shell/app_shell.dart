@@ -69,7 +69,8 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
     // Back: collapse the expanded player first (before the router pops pages), then go to Home, then exit.
     return BackButtonListener(
       onBackButtonPressed: () async {
-        if (_panel.value == 0) return false;
+        // A sheet/dialog above the shell (e.g. Up next) closes first.
+        if (_panel.value == 0 || ModalRoute.of(context)?.isCurrent == false) return false;
         ref.read(playerPanelProvider.notifier).collapse();
         return true;
       },

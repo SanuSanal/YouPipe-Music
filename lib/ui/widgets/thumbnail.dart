@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -46,6 +48,8 @@ class YtImage extends StatelessWidget {
     );
     final image = url == null
         ? placeholder
+        : url.startsWith('/')
+        ? Image.file(File(url), fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder)
         : CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.cover,

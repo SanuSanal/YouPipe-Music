@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/library_repository.dart';
+import 'downloads_view.dart';
 import '../../innertube/models.dart';
 import '../../providers.dart';
 import '../../ui/navigation.dart';
@@ -13,7 +14,7 @@ import '../../ui/widgets/states.dart';
 import '../../ui/widgets/thumbnail.dart';
 import '../home/home_screen.dart' show YtChip;
 
-enum LibraryFilter { playlists, songs, albums, artists }
+enum LibraryFilter { playlists, songs, albums, artists, downloads }
 
 extension on LibraryFilter {
   String get label => switch (this) {
@@ -21,6 +22,7 @@ extension on LibraryFilter {
     LibraryFilter.songs => 'Songs',
     LibraryFilter.albums => 'Albums',
     LibraryFilter.artists => 'Artists',
+    LibraryFilter.downloads => 'Downloads',
   };
 }
 
@@ -134,7 +136,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               ),
             ),
           ),
-          if (_filter == LibraryFilter.songs)
+          if (_filter == LibraryFilter.downloads)
+            const DownloadsSliver()
+          else if (_filter == LibraryFilter.songs)
             liked.isEmpty
                 ? const SliverFillRemaining(
                     hasScrollBody: false,

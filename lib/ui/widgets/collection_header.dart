@@ -78,6 +78,8 @@ class CollectionHeader extends StatelessWidget {
     this.saved = false,
     this.onSave,
     this.onShuffle,
+    this.onDownload,
+    this.downloaded = false,
     this.onShare,
     this.onMore,
   });
@@ -94,6 +96,10 @@ class CollectionHeader extends StatelessWidget {
   final VoidCallback onPlay;
   final VoidCallback? onSave;
   final VoidCallback? onShuffle;
+  final VoidCallback? onDownload;
+
+  /// All songs are available offline.
+  final bool downloaded;
   final VoidCallback? onShare;
   final VoidCallback? onMore;
 
@@ -145,7 +151,7 @@ class CollectionHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _RoundAction(icon: Icons.shuffle, onPressed: onShuffle),
+              _RoundAction(icon: downloaded ? Icons.download_done : Icons.download_outlined, onPressed: onDownload),
               _RoundAction(icon: saved ? Icons.library_add_check : Icons.library_add_outlined, onPressed: onSave),
               SizedBox(
                 width: 64,

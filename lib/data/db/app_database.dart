@@ -85,6 +85,22 @@ class LocalPlaylistItems extends Table {
   IntColumn get position => integer()();
 }
 
+enum DownloadStatus { queued, downloading, done, failed }
+
+/// Songs saved for offline playback.
+class Downloads extends Table {
+  TextColumn get videoId => text().references(Songs, #videoId)();
+  IntColumn get status => intEnum<DownloadStatus>()();
+  TextColumn get filePath => text().nullable()();
+  TextColumn get artPath => text().nullable()();
+  IntColumn get sizeBytes => integer().withDefault(const Constant(0))();
+  IntColumn get downloadedBytes => integer().withDefault(const Constant(0))();
+  DateTimeColumn get addedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {videoId};
+}
+
 class SearchHistory extends Table {
   TextColumn get query => text()();
   DateTimeColumn get searchedAt => dateTime()();
@@ -104,17 +120,22 @@ class SearchHistory extends Table {
     LocalPlaylists,
     LocalPlaylistItems,
     SearchHistory,
+    Downloads,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? driftDatabase(name: 'youpipe'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
-  MigrationStrategy get migration =>
-      MigrationStrategy(beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'));
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      if (from < 2) await m.createTable(downloads);
+    },
+    beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'),
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

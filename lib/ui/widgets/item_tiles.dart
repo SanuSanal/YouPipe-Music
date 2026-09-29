@@ -35,6 +35,7 @@ class ResponsiveListTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isCurrent = item is SongItem && ref.watch(currentSongProvider)?.videoId == item.id;
+    final downloaded = item is SongItem && ref.watch(downloadedIdsProvider).contains(item.id);
     final theme = Theme.of(context);
 
     final Widget leading;
@@ -85,10 +86,15 @@ class ResponsiveListTile extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
-                  if ((subtitle ?? rowSubtitle(item)).isNotEmpty || explicit) ...[
+                  if ((subtitle ?? rowSubtitle(item)).isNotEmpty || explicit || downloaded) ...[
                     const SizedBox(height: 2),
                     Row(
                       children: [
+                        if (downloaded)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(Icons.download_done, size: 16, color: YtmColors.textSecondary),
+                          ),
                         if (explicit) const ExplicitBadge(),
                         Expanded(
                           child: Text(

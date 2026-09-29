@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/db/app_database.dart';
+import 'data/download_manager.dart';
 import 'data/lyrics/lyrics_service.dart';
 import 'data/sponsorblock.dart';
 import 'data/library_repository.dart';
@@ -22,6 +23,28 @@ final streamResolverProvider = Provider<StreamResolver>((ref) => throw Unimpleme
 final audioHandlerProvider = Provider<YouPipeAudioHandler>((ref) => throw UnimplementedError('overridden in main'));
 final databaseProvider = Provider<AppDatabase>((ref) => throw UnimplementedError('overridden in main'));
 final prefsProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError('overridden in main'));
+
+final downloadManagerProvider = Provider<DownloadManager>((ref) {
+  final manager = DownloadManager(ref.watch(databaseProvider), ref.watch(streamResolverProvider));
+  ref.read(audioHandlerProvider).localFile = manager.localPath;
+  return manager;
+});
+
+final downloadsProvider = StreamProvider<List<DownloadEntry>>((ref) => ref.watch(downloadManagerProvider).watchAll());
+
+/// Video ids of finished downloads (for the row indicator).
+final downloadedIdsProvider = Provider<Set<String>>(
+  (ref) => {
+    for (final d in ref.watch(downloadsProvider).value ?? const <DownloadEntry>[])
+      if (d.row.status == DownloadStatus.done) d.song.videoId,
+  },
+);
+
+/// Download state of one song (null = not downloaded).
+final downloadStatusProvider = Provider.family<DownloadStatus?, String>((ref, videoId) {
+  final all = ref.watch(downloadsProvider).value ?? const <DownloadEntry>[];
+  return all.where((d) => d.song.videoId == videoId).firstOrNull?.row.status;
+});
 
 final sponsorBlockProvider = Provider<SponsorBlockService>((ref) => SponsorBlockService());
 
@@ -107,7 +130,7 @@ class SettingsController extends Notifier<AppSettings> {
 
 @immutable
 class AudioEffectsState {
-  const AudioEffectsState({this.eqEnabled = false, this.gains = const [], this.loudnessDb = 0, this.preset = 'Flat'});
+  const AudioEffectsState({this.eqEnabled = false, this.gains = const [], this.loudnessDb = 0, this.preset = ''});
 
   final bool eqEnabled;
   final List<double> gains;
@@ -129,7 +152,7 @@ class AudioEffectsController extends Notifier<AudioEffectsState> {
       eqEnabled: p.getBool('eqEnabled') ?? false,
       gains: (p.getStringList('eqGains') ?? const []).map(double.parse).toList(),
       loudnessDb: p.getDouble('loudnessDb') ?? 0,
-      preset: p.getString('eqPreset') ?? 'Flat',
+      preset: p.getString('eqPreset') ?? '',
     );
     ref
         .read(audioHandlerProvider)
