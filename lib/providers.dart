@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/db/app_database.dart';
+import 'data/lyrics/lyrics_service.dart';
 import 'data/library_repository.dart';
 import 'data/stream_resolver.dart';
 import 'innertube/innertube.dart';
@@ -83,8 +84,89 @@ class SettingsController extends Notifier<AppSettings> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Audio effects (equalizer, loudness), persisted in prefs and applied to the audio handler
+// ---------------------------------------------------------------------------------------------
+
+@immutable
+class AudioEffectsState {
+  const AudioEffectsState({this.eqEnabled = false, this.gains = const [], this.loudnessDb = 0, this.preset = 'Flat'});
+
+  final bool eqEnabled;
+  final List<double> gains;
+
+  /// Loudness boost in dB (0 = off).
+  final double loudnessDb;
+  final String preset;
+}
+
+final audioEffectsProvider = NotifierProvider<AudioEffectsController, AudioEffectsState>(AudioEffectsController.new);
+
+class AudioEffectsController extends Notifier<AudioEffectsState> {
+  SharedPreferences get _prefs => ref.read(prefsProvider);
+
+  @override
+  AudioEffectsState build() {
+    final p = ref.watch(prefsProvider);
+    final s = AudioEffectsState(
+      eqEnabled: p.getBool('eqEnabled') ?? false,
+      gains: (p.getStringList('eqGains') ?? const []).map(double.parse).toList(),
+      loudnessDb: p.getDouble('loudnessDb') ?? 0,
+      preset: p.getString('eqPreset') ?? 'Flat',
+    );
+    ref
+        .read(audioHandlerProvider)
+        .restoreAudioEffects(eqEnabled: s.eqEnabled, gains: s.gains, loudnessDb: s.loudnessDb);
+    return s;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = AudioEffectsState(
+      eqEnabled: enabled,
+      gains: state.gains,
+      loudnessDb: state.loudnessDb,
+      preset: state.preset,
+    );
+    await ref.read(audioHandlerProvider).equalizer.setEnabled(enabled);
+    await _prefs.setBool('eqEnabled', enabled);
+  }
+
+  Future<void> setGains(List<double> gains, {String preset = 'Custom'}) async {
+    state = AudioEffectsState(eqEnabled: state.eqEnabled, gains: gains, loudnessDb: state.loudnessDb, preset: preset);
+    final params = await ref.read(audioHandlerProvider).equalizer.parameters;
+    for (final band in params.bands) {
+      if (band.index < gains.length) await band.setGain(gains[band.index]);
+    }
+    await _prefs.setStringList('eqGains', gains.map((g) => g.toStringAsFixed(2)).toList());
+    await _prefs.setString('eqPreset', preset);
+  }
+
+  Future<void> setLoudness(double db) async {
+    state = AudioEffectsState(eqEnabled: state.eqEnabled, gains: state.gains, loudnessDb: db, preset: state.preset);
+    final loudness = ref.read(audioHandlerProvider).loudness;
+    await loudness.setEnabled(db > 0);
+    await loudness.setTargetGain(db);
+    await _prefs.setDouble('loudnessDb', db);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // Player
 // ---------------------------------------------------------------------------------------------
+
+final sleepTimerProvider = StreamProvider<SleepTimer?>((ref) {
+  final handler = ref.watch(audioHandlerProvider);
+  final controller = StreamController<SleepTimer?>();
+  void emit() => controller.add(handler.sleepTimer.value);
+  handler.sleepTimer.addListener(emit);
+  emit();
+  ref.onDispose(() {
+    handler.sleepTimer.removeListener(emit);
+    controller.close();
+  });
+  return controller.stream;
+});
+
+final speedProvider = StreamProvider<double>((ref) => ref.watch(audioHandlerProvider).speedStream);
 
 final queueStateProvider = StreamProvider<QueueState>((ref) {
   final handler = ref.watch(audioHandlerProvider);
@@ -204,9 +286,13 @@ final nextInfoProvider = FutureProvider.autoDispose.family<NextPage, String>(
   (ref, videoId) => ref.watch(innerTubeProvider).next(WatchEndpoint(videoId: videoId)),
 );
 
-final lyricsProvider = FutureProvider.autoDispose.family<Lyrics?, String>((ref, videoId) async {
-  final ep = (await ref.watch(nextInfoProvider(videoId).future)).lyricsEndpoint;
-  return ep == null ? null : ref.watch(innerTubeProvider).lyrics(ep);
+final lyricsServiceProvider = Provider<LyricsService>((ref) => LyricsService(ref.watch(innerTubeProvider)));
+
+/// Synced (LRCLIB) or plain (YouTube Music) lyrics for a song.
+final songLyricsProvider = FutureProvider.autoDispose.family<SongLyrics?, SongItem>((ref, song) {
+  final handler = ref.read(audioHandlerProvider);
+  final duration = handler.queueState.value.current?.videoId == song.videoId ? handler.duration : null;
+  return ref.watch(lyricsServiceProvider).lyricsFor(song, duration: duration);
 });
 
 final relatedProvider = FutureProvider.autoDispose.family<List<Section>, String>((ref, videoId) async {

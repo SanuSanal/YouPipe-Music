@@ -8,6 +8,7 @@ import '../navigation.dart';
 import '../theme/ytm_theme.dart';
 import 'states.dart';
 import 'thumbnail.dart';
+import '../../features/player/player_options.dart';
 
 String shareUrl(YTItem item) => switch (item) {
   SongItem() => 'https://music.youtube.com/watch?v=${item.videoId}',
@@ -35,19 +36,21 @@ Future<List<SongItem>> _songsOf(WidgetRef ref, YTItem item) async {
 }
 
 /// The long-press / ⋮ bottom sheet from YouTube Music.
-Future<void> showItemMenu(BuildContext context, WidgetRef ref, YTItem item) {
+/// [inPlayer] adds the player-only entries (sleep timer, speed, equalizer).
+Future<void> showItemMenu(BuildContext context, WidgetRef ref, YTItem item, {bool inPlayer = false}) {
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ItemMenu(item: item, hostContext: context),
+    builder: (sheetContext) => _ItemMenu(item: item, hostContext: context, inPlayer: inPlayer),
   );
 }
 
 class _ItemMenu extends ConsumerWidget {
-  const _ItemMenu({required this.item, required this.hostContext});
+  const _ItemMenu({required this.item, required this.hostContext, this.inPlayer = false});
 
   final YTItem item;
+  final bool inPlayer;
 
   /// Context of the screen that opened the menu (the sheet's own context dies on close).
   final BuildContext hostContext;
@@ -71,6 +74,26 @@ class _ItemMenu extends ConsumerWidget {
     }
 
     final tiles = <Widget>[
+      if (inPlayer) ...[
+        ListTile(
+          leading: const Icon(Icons.bedtime_outlined, color: YtmColors.textPrimary),
+          title: const Text('Sleep timer'),
+          subtitle: Text(sleepTimerLabel(ref)),
+          onTap: () {
+            Navigator.of(context).pop();
+            showSleepTimerSheet(hostContext, ref);
+          },
+        ),
+        _tile(Icons.speed, 'Playback speed', () {
+          Navigator.of(context).pop();
+          showSpeedSheet(hostContext, ref);
+        }),
+        _tile(Icons.equalizer, 'Equalizer', () {
+          Navigator.of(context).pop();
+          showEqualizerSheet(hostContext);
+        }),
+        const Divider(),
+      ],
       if (item case SongItem song) ...[
         _tile(Icons.sensors, 'Start radio', () => run(() => actions.startRadio(song))),
         _tile(Icons.playlist_play, 'Play next', () => run(() async => actions.playNext([song]), 'Song will play next')),

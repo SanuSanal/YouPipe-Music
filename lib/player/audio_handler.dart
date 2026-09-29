@@ -11,6 +11,14 @@ import '../innertube/models.dart';
 
 enum QueueRepeatMode { off, all, one }
 
+@immutable
+class SleepTimer {
+  const SleepTimer({this.endsAt, this.endOfSong = false});
+
+  final DateTime? endsAt;
+  final bool endOfSong;
+}
+
 /// Loads more songs for an endless queue (radio). Returns an empty list when exhausted.
 typedef QueueExtender = Future<List<SongItem>> Function();
 
@@ -57,7 +65,15 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   final StreamResolver _resolver;
-  final _player = AudioPlayer();
+
+  /// Android audio effects, configured from the Equalizer sheet.
+  final equalizer = AndroidEqualizer();
+  final loudness = AndroidLoudnessEnhancer();
+  late final _player = AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [loudness, equalizer]));
+
+  /// When playback will stop, if a sleep timer is set.
+  final sleepTimer = ValueNotifier<SleepTimer?>(null);
+  Timer? _sleepTimer;
 
   /// The queue as rich song models (audio_service's `queue` only carries MediaItems).
   final queueState = ValueNotifier(const QueueState());
@@ -256,6 +272,11 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _onCompleted() {
+    if (sleepTimer.value?.endOfSong == true) {
+      cancelSleepTimer();
+      _player.pause();
+      return;
+    }
     final s = queueState.value;
     if (s.repeat == QueueRepeatMode.one) {
       _player.seek(Duration.zero);
@@ -352,6 +373,63 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     } else {
       await _loadIndex(queueState.value.index - 1);
     }
+  }
+
+  // Sleep timer, speed ---------------------------------------------------------------------
+
+  Stream<double> get speedStream => _player.speedStream;
+  double get speed => _player.speed;
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    await _player.setSpeed(speed);
+    _broadcastState(null);
+  }
+
+  void setSleepTimer(Duration duration) {
+    _sleepTimer?.cancel();
+    sleepTimer.value = SleepTimer(endsAt: DateTime.now().add(duration));
+    _sleepTimer = Timer(duration, _fadeOutAndPause);
+  }
+
+  void sleepAtEndOfSong() {
+    _sleepTimer?.cancel();
+    sleepTimer.value = const SleepTimer(endOfSong: true);
+  }
+
+  void cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    sleepTimer.value = null;
+  }
+
+  Future<void> _fadeOutAndPause() async {
+    const steps = 20;
+    for (var i = steps; i >= 0; i--) {
+      if (sleepTimer.value == null) break;
+      await _player.setVolume(i / steps);
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    await _player.pause();
+    await _player.setVolume(1);
+    cancelSleepTimer();
+  }
+
+  // Audio effects ------------------------------------------------------------------------------
+
+  /// Re-applies saved equalizer settings; band gains are set once the effect is active.
+  void restoreAudioEffects({required bool eqEnabled, required List<double> gains, required double loudnessDb}) {
+    equalizer.setEnabled(eqEnabled);
+    loudness.setEnabled(loudnessDb > 0);
+    loudness.setTargetGain(loudnessDb);
+    if (gains.isEmpty) return;
+    unawaited(
+      equalizer.parameters.then((p) async {
+        for (final band in p.bands) {
+          if (band.index < gains.length) await band.setGain(gains[band.index]);
+        }
+      }),
+    );
   }
 
   @override

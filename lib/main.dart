@@ -62,6 +62,7 @@ class _YouPipeAppState extends ConsumerState<YouPipeApp> {
   Widget build(BuildContext context) {
     // Applies saved region/language/quality to the services on startup.
     ref.watch(settingsProvider);
+    ref.watch(audioEffectsProvider);
     return MaterialApp.router(
       title: 'YouPipe Music',
       debugShowCheckedModeBanner: false,

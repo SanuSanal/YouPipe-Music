@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'lyrics_view.dart';
+
 import '../../player/audio_handler.dart';
 import '../../providers.dart';
 import '../../ui/theme/ytm_theme.dart';
@@ -59,7 +61,7 @@ Future<void> showQueueSheet(BuildContext context, {int initialTab = 0}) {
               dividerColor: YtmColors.divider,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.6),
             ),
-            const Expanded(child: TabBarView(children: [_UpNextTab(), _LyricsTab(), _RelatedTab()])),
+            const Expanded(child: TabBarView(children: [_UpNextTab(), LyricsView(), _RelatedTab()])),
           ],
         ),
       ),
@@ -152,40 +154,6 @@ class _UpNextTab extends ConsumerWidget {
         ),
       ],
     );
-  }
-}
-
-class _LyricsTab extends ConsumerWidget {
-  const _LyricsTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final song = ref.watch(currentSongProvider);
-    if (song == null) return const SizedBox.shrink();
-    final lyrics = ref.watch(lyricsProvider(song.videoId));
-    return switch (lyrics) {
-      AsyncData(value: null) => const EmptyView(icon: Icons.lyrics_outlined, title: 'Lyrics not available'),
-      AsyncData(:final value?) => ListView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
-        children: [
-          Text(
-            value.text,
-            style: const TextStyle(
-              fontSize: 20,
-              height: 1.6,
-              fontWeight: FontWeight.w500,
-              color: YtmColors.textPrimary,
-            ),
-          ),
-          if (value.source != null) ...[
-            const SizedBox(height: 24),
-            Text(value.source!, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ],
-      ),
-      AsyncError(:final error) => ErrorView(error: error, onRetry: () => ref.invalidate(lyricsProvider(song.videoId))),
-      _ => const LoadingView(),
-    };
   }
 }
 

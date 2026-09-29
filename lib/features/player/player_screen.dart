@@ -57,7 +57,10 @@ class PlayerScreen extends ConsumerWidget {
                     const Spacer(),
                     const _SongVideoToggle(),
                     const Spacer(),
-                    IconButton(icon: const Icon(Icons.more_vert), onPressed: () => showItemMenu(context, ref, song)),
+                    IconButton(
+                      icon: const Icon(Icons.more_vert),
+                      onPressed: () => showItemMenu(context, ref, song, inPlayer: true),
+                    ),
                   ],
                 ),
               ),
