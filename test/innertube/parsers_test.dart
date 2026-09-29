@@ -87,6 +87,10 @@ void main() {
     expect(first.album?.name, 'Chillhop Daydreams 2');
     expect(first.duration, const Duration(minutes: 3, seconds: 34));
     expect(first.setVideoId, isNotNull);
+    // Signed out, "Save to library" is a sign-in prompt; the remove token is still present.
+    expect(first.inLibrary, isFalse);
+    expect(first.libraryAddToken, isNull);
+    expect(first.libraryRemoveToken, isNotNull);
     expect(page.continuation, isNotNull);
 
     final related = parsePlaylistContinuation(fixture('playlist_continuation.json'));

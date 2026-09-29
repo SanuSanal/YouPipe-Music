@@ -177,6 +177,9 @@ class InnerTube {
   Future<SectionsPage> library(LibraryPage page) async =>
       parseSectionsPage(await _browse(BrowseEndpoint(page.browseId)));
 
+  /// Sends menu feedback tokens (e.g. "Save to library" / "Remove from library").
+  Future<void> feedback(List<String> tokens) => _post('feedback', {'feedbackTokens': tokens});
+
   Future<void> like(String videoId) => _post('like/like', {
     'target': {'videoId': videoId},
   });

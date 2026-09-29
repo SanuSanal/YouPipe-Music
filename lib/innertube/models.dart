@@ -96,6 +96,9 @@ class SongItem extends YTItem {
     this.explicit = false,
     this.subtitle = '',
     this.setVideoId,
+    this.libraryAddToken,
+    this.libraryRemoveToken,
+    this.inLibrary = false,
   });
 
   final String videoId;
@@ -116,6 +119,11 @@ class SongItem extends YTItem {
   /// Position id inside a playlist/queue (`playlistSetVideoId`).
   final String? setVideoId;
 
+  /// Feedback tokens for YouTube Music's "Save to library" / "Remove from library" (signed in).
+  final String? libraryAddToken;
+  final String? libraryRemoveToken;
+  final bool inLibrary;
+
   @override
   String get id => videoId;
 
@@ -134,6 +142,9 @@ class SongItem extends YTItem {
     explicit: explicit,
     subtitle: subtitle,
     setVideoId: setVideoId,
+    libraryAddToken: libraryAddToken,
+    libraryRemoveToken: libraryRemoveToken,
+    inLibrary: inLibrary,
   );
 }
 

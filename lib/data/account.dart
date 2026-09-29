@@ -77,6 +77,7 @@ class AccountActions {
     if (!_signedIn) return;
     try {
       await call();
+      _ref.invalidate(accountLibraryProvider);
     } catch (e) {
       debugPrint('YouPipe: account sync failed: $e');
     }
@@ -85,6 +86,15 @@ class AccountActions {
   Future<void> setLiked(SongItem song, bool liked) async {
     await _ref.read(libraryProvider).setLiked(song, liked);
     await _remote(() => liked ? _yt.like(song.videoId) : _yt.removeLike(song.videoId));
+  }
+
+  /// YouTube Music's "Save to library" / "Remove from library" for a song (signed in only).
+  Future<bool> setInLibrary(SongItem song, bool inLibrary) async {
+    final token = inLibrary ? song.libraryAddToken : song.libraryRemoveToken;
+    if (!_signedIn || token == null) return false;
+    await _yt.feedback([token]);
+    _ref.invalidate(accountLibraryProvider);
+    return true;
   }
 
   Future<void> setSaved(YTItem item, bool saved, {String? channelId}) async {
@@ -111,5 +121,9 @@ final accountLibraryProvider = FutureProvider.autoDispose.family<List<YTItem>, L
   final auth = await ref.watch(authProvider.future);
   if (!auth.signedIn) return const [];
   final result = await ref.watch(innerTubeProvider).library(page);
-  return result.sections.expand((s) => s.items).toList();
+  return result.sections
+      .expand((s) => s.items)
+      // SE = "Episodes for Later": podcasts aren't supported.
+      .where((i) => !(i is PlaylistItem && i.id == 'SE'))
+      .toList();
 });

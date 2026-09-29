@@ -242,6 +242,22 @@ YTItem? parseTwoRowItem(Json r) {
   );
 }
 
+/// The "Save to library" toggle in a row's menu: (addToken, removeToken, inLibrary).
+/// Signed out, the add action is a sign-in modal, so only the remove token is a real token.
+(String?, String?, bool) libraryTokens(Json renderer) {
+  for (final item in navList(renderer, ['menu', 'menuRenderer', 'items'])) {
+    final t = item['toggleMenuServiceItemRenderer'];
+    if (t is! Json) continue;
+    final icon = nav<String>(t, ['defaultIcon', 'iconType']);
+    final saved = icon == 'BOOKMARK' || icon == 'LIBRARY_SAVED' || icon == 'LIBRARY_REMOVE';
+    if (!saved && icon != 'BOOKMARK_BORDER' && icon != 'LIBRARY_ADD') continue;
+    final def = nav<String>(t, ['defaultServiceEndpoint', 'feedbackEndpoint', 'feedbackToken']);
+    final tog = nav<String>(t, ['toggledServiceEndpoint', 'feedbackEndpoint', 'feedbackToken']);
+    return saved ? (tog, def, true) : (def, tog, false);
+  }
+  return (null, null, false);
+}
+
 /// `musicResponsiveListItemRenderer`: the rows in search results, playlists, albums and shelves.
 YTItem? parseResponsiveListItem(Json r) {
   final flex = navList(r, [
@@ -279,7 +295,7 @@ YTItem? parseResponsiveListItem(Json r) {
       nav<String>(titleRuns.firstOrNull, ['navigationEndpoint', 'watchEndpoint', 'videoId']) ??
       (r['navigationEndpoint'] == null ? nav<String>(playEndpoint, ['watchEndpoint', 'videoId']) : null);
 
-  return itemFromParts(
+  final item = itemFromParts(
     endpoint: endpoint,
     title: title,
     sub: parseSubtitle(subRuns),
@@ -288,6 +304,24 @@ YTItem? parseResponsiveListItem(Json r) {
     videoId: videoId,
     setVideoId: nav<String>(r, ['playlistItemData', 'playlistSetVideoId']),
     playlistId: nav<String>(playEndpoint, ['watchPlaylistEndpoint', 'playlistId']),
+  );
+  if (item is! SongItem) return item;
+  final (add, remove, inLibrary) = libraryTokens(r);
+  if (add == null && remove == null) return item;
+  return SongItem(
+    videoId: item.videoId,
+    title: item.title,
+    artists: item.artists,
+    album: item.album,
+    duration: item.duration,
+    thumbnails: item.thumbnails,
+    isVideo: item.isVideo,
+    explicit: item.explicit,
+    subtitle: item.subtitle,
+    setVideoId: item.setVideoId,
+    libraryAddToken: add,
+    libraryRemoveToken: remove,
+    inLibrary: inLibrary,
   );
 }
 

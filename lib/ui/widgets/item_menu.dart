@@ -117,6 +117,16 @@ class _ItemMenu extends ConsumerWidget {
           Navigator.of(context).pop();
           showSaveToPlaylist(hostContext, ref, [song]);
         }),
+        if (ref.read(innerTubeProvider).signedIn &&
+            (song.inLibrary ? song.libraryRemoveToken : song.libraryAddToken) != null)
+          _tile(
+            song.inLibrary ? Icons.bookmark : Icons.bookmark_border,
+            song.inLibrary ? 'Remove from library' : 'Save to library',
+            () => run(
+              () => account.setInLibrary(song, !song.inLibrary),
+              song.inLibrary ? 'Removed from library' : 'Saved to library',
+            ),
+          ),
         if (downloadStatus == null || downloadStatus == DownloadStatus.failed)
           _tile(Icons.download_outlined, 'Download', () => run(() => downloads.enqueue([song]), 'Downloading…'))
         else

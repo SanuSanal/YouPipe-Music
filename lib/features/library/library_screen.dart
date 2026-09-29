@@ -86,117 +86,122 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     ];
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const SliverAppBar(
-            floating: true,
-            snap: true,
-            titleSpacing: YtmSizes.pagePadding,
-            title: YouPipeWordmark(),
-            actions: [TopBarActions()],
-          ),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 52,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(YtmSizes.pagePadding, 6, YtmSizes.pagePadding, 10),
-                children: [
-                  if (_filter != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: YtChip(label: '✕', selected: false, onTap: () => setState(() => _filter = null)),
-                    ),
-                  for (final f in LibraryFilter.values)
-                    if (_filter == null || _filter == f)
+      body: RefreshIndicator(
+        color: YtmColors.textPrimary,
+        backgroundColor: YtmColors.surface,
+        onRefresh: () async => ref.invalidate(accountLibraryProvider),
+        child: CustomScrollView(
+          slivers: [
+            const SliverAppBar(
+              floating: true,
+              snap: true,
+              titleSpacing: YtmSizes.pagePadding,
+              title: YouPipeWordmark(),
+              actions: [TopBarActions()],
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 52,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(YtmSizes.pagePadding, 6, YtmSizes.pagePadding, 10),
+                  children: [
+                    if (_filter != null)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: YtChip(
-                          label: f.label,
-                          selected: _filter == f,
-                          onTap: () => setState(() => _filter = _filter == f ? null : f),
-                        ),
+                        child: YtChip(label: '✕', selected: false, onTap: () => setState(() => _filter = null)),
                       ),
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: YtmSizes.pagePadding - 8),
-              child: Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.sort, color: YtmColors.textPrimary, size: 20),
-                    label: const Text('Recent activity', style: TextStyle(color: YtmColors.textPrimary)),
-                  ),
-                  const Spacer(),
-                  if (_filter == null || _filter == LibraryFilter.playlists)
-                    IconButton(
-                      tooltip: 'New playlist',
-                      icon: const Icon(Icons.add),
-                      onPressed: () async {
-                        final name = await promptText(context, title: 'New playlist', hint: 'Title');
-                        if (name != null && name.trim().isNotEmpty) {
-                          await ref.read(libraryProvider).createPlaylist(name.trim());
-                        }
-                      },
-                    ),
-                  IconButton(
-                    tooltip: _grid ? 'List view' : 'Grid view',
-                    icon: Icon(_grid ? Icons.view_list : Icons.grid_view),
-                    onPressed: () => setState(() => _grid = !_grid),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_filter == LibraryFilter.downloads)
-            const DownloadsSliver()
-          else if (_filter == LibraryFilter.songs)
-            songs.isEmpty
-                ? const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyView(
-                      icon: Icons.thumb_up_outlined,
-                      title: 'No liked songs yet',
-                      message: 'Songs you like will show up here.',
-                    ),
-                  )
-                : SliverList.builder(
-                    itemCount: songs.length,
-                    itemBuilder: (context, i) => ResponsiveListTile(
-                      item: songs[i],
-                      onTap: () => ref.read(playerActionsProvider).playList(songs, index: i, title: 'Songs'),
-                    ),
-                  )
-          else if (entries.isEmpty)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: EmptyView(icon: Icons.library_music_outlined, title: 'Nothing saved yet'),
-            )
-          else if (_grid)
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: YtmSizes.pagePadding),
-              sliver: SliverGrid.builder(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 200,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.72,
+                    for (final f in LibraryFilter.values)
+                      if (_filter == null || _filter == f)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: YtChip(
+                            label: f.label,
+                            selected: _filter == f,
+                            onTap: () => setState(() => _filter = _filter == f ? null : f),
+                          ),
+                        ),
+                  ],
                 ),
-                itemCount: entries.length,
-                itemBuilder: (context, i) => entries[i].buildCard(context, ref),
               ),
-            )
-          else
-            SliverList.builder(
-              itemCount: entries.length,
-              itemBuilder: (context, i) => entries[i].buildRow(context, ref),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 140)),
-        ],
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: YtmSizes.pagePadding - 8),
+                child: Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.sort, color: YtmColors.textPrimary, size: 20),
+                      label: const Text('Recent activity', style: TextStyle(color: YtmColors.textPrimary)),
+                    ),
+                    const Spacer(),
+                    if (_filter == null || _filter == LibraryFilter.playlists)
+                      IconButton(
+                        tooltip: 'New playlist',
+                        icon: const Icon(Icons.add),
+                        onPressed: () async {
+                          final name = await promptText(context, title: 'New playlist', hint: 'Title');
+                          if (name != null && name.trim().isNotEmpty) {
+                            await ref.read(libraryProvider).createPlaylist(name.trim());
+                          }
+                        },
+                      ),
+                    IconButton(
+                      tooltip: _grid ? 'List view' : 'Grid view',
+                      icon: Icon(_grid ? Icons.view_list : Icons.grid_view),
+                      onPressed: () => setState(() => _grid = !_grid),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_filter == LibraryFilter.downloads)
+              const DownloadsSliver()
+            else if (_filter == LibraryFilter.songs)
+              songs.isEmpty
+                  ? const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: EmptyView(
+                        icon: Icons.thumb_up_outlined,
+                        title: 'No liked songs yet',
+                        message: 'Songs you like will show up here.',
+                      ),
+                    )
+                  : SliverList.builder(
+                      itemCount: songs.length,
+                      itemBuilder: (context, i) => ResponsiveListTile(
+                        item: songs[i],
+                        onTap: () => ref.read(playerActionsProvider).playList(songs, index: i, title: 'Songs'),
+                      ),
+                    )
+            else if (entries.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyView(icon: Icons.library_music_outlined, title: 'Nothing saved yet'),
+              )
+            else if (_grid)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: YtmSizes.pagePadding),
+                sliver: SliverGrid.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 200,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.72,
+                  ),
+                  itemCount: entries.length,
+                  itemBuilder: (context, i) => entries[i].buildCard(context, ref),
+                ),
+              )
+            else
+              SliverList.builder(
+                itemCount: entries.length,
+                itemBuilder: (context, i) => entries[i].buildRow(context, ref),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 140)),
+          ],
+        ),
       ),
     );
   }
