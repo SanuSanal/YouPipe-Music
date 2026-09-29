@@ -44,15 +44,15 @@ void main() {
     });
   });
 
-  test('parses sha256sum output', () {
-    const text =
-        '553b6f4fe1c49c47260bc234073e2f7ae0b361e8d33e53a5d59353430e466733  YouPipe-Music-v0.0.3-arm64-v8a.apk\n'
-        'A6D8C3717EECA7AD2D4D5F6ED8200DCF90D2011F64A8EBBE4B260A614FCA8C09 *YouPipe-Music-v0.0.3-armeabi-v7a.apk\r\n'
-        'not a checksum line\n';
-    expect(parseSha256Sums(text), {
-      'YouPipe-Music-v0.0.3-arm64-v8a.apk': '553b6f4fe1c49c47260bc234073e2f7ae0b361e8d33e53a5d59353430e466733',
-      'YouPipe-Music-v0.0.3-armeabi-v7a.apk': 'a6d8c3717eeca7ad2d4d5f6ed8200dcf90d2011f64a8ebbe4b260a614fca8c09',
-    });
+  test('reads the SHA-256 from GitHub asset digests', () {
+    final apk = release.assets.firstWhere((a) => a.name.endsWith('-arm64-v8a.apk'));
+    expect(apk.sha256, '553b6f4fe1c49c47260bc234073e2f7ae0b361e8d33e53a5d59353430e466733');
+    expect(
+      parseSha256Digest('sha256:A6D8C3717EECA7AD2D4D5F6ED8200DCF90D2011F64A8EBBE4B260A614FCA8C09'),
+      'a6d8c3717eeca7ad2d4d5f6ed8200dcf90d2011f64a8ebbe4b260a614fca8c09',
+    );
+    expect(parseSha256Digest(null), isNull);
+    expect(parseSha256Digest('sha512:abc'), isNull);
   });
 
   group('release notes', () {
@@ -60,14 +60,22 @@ void main() {
       expect(cleanReleaseNotes(release.notes), isEmpty);
     });
 
-    test('turns generated notes into plain bullets', () {
+    test('turns the workflow notes into plain bullets', () {
+      const body =
+          "## What's new\n\n"
+          '- Add an in-app update checker for GitHub releases\n'
+          '- Fix **lyrics** sync\n\n'
+          '**Which APK?** Most phones need `arm64-v8a`.';
+      expect(cleanReleaseNotes(body), '• Add an in-app update checker for GitHub releases\n• Fix lyrics sync');
+    });
+
+    test('still reads the older GitHub-generated notes', () {
       const body =
           '**Which APK?** Most phones need `arm64-v8a`.\n\n'
           "## What's Changed\n"
-          '* Add an update checker by @SanuSanal in https://github.com/SanuSanal/YouPipe-Music/pull/5\n'
-          '* Fix **lyrics** sync by @someone in https://github.com/SanuSanal/YouPipe-Music/pull/6\n\n'
+          '* Add an update checker by @SanuSanal in https://github.com/SanuSanal/YouPipe-Music/pull/5\n\n'
           '**Full Changelog**: https://github.com/SanuSanal/YouPipe-Music/compare/v0.0.3...v0.0.4';
-      expect(cleanReleaseNotes(body), '• Add an update checker\n• Fix lyrics sync');
+      expect(cleanReleaseNotes(body), '• Add an update checker');
     });
   });
 }

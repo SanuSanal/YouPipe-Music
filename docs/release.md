@@ -13,11 +13,14 @@ The workflow:
 
 1. Checks the tag format, then runs `flutter analyze` and `flutter test`.
 2. Builds split APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) with `--build-name` taken from the tag and `--build-number` set to `github.run_number`. Nothing is committed back; `pubspec.yaml`'s version is only the local default.
-3. Publishes a GitHub release for the tag with `YouPipe-Music-v1.2.3-<abi>.apk`, `SHA256SUMS.txt` and generated notes.
+3. Writes the notes: a "What's new" list of the commit subjects since the last published release (with the squash-merge `(#12)` suffix removed, so they don't point at PRs), plus a "Which APK?" hint. Good commit subjects make good release notes.
+4. Publishes a GitHub release for the tag with only the `YouPipe-Music-v1.2.3-<abi>.apk` files. GitHub records a SHA-256 digest for each, which the updater checks.
+
+GitHub always adds "Source code (zip / tar.gz)" to a release. It can't be turned off, but those archives are generated from the tag on demand, not stored, so they don't add to the repo's size.
 
 A failed run leaves no release. Delete and re-push the tag to retry.
 
-**Installed apps update themselves from these releases** (see [updates.md](updates.md)). The tag format, the `-<abi>.apk` asset names, `SHA256SUMS.txt` and the signing key are a contract with the updater; don't change them.
+**Installed apps update themselves from these releases** (see [updates.md](updates.md)). The tag format, the `-<abi>.apk` asset names and the signing key are a contract with the updater; don't change them.
 
 ## Signing
 

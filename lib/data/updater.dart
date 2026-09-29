@@ -28,14 +28,21 @@ class AppInfo {
 }
 
 class ReleaseAsset {
-  const ReleaseAsset({required this.name, required this.url, required this.size});
+  const ReleaseAsset({required this.name, required this.url, required this.size, this.sha256});
 
-  factory ReleaseAsset.fromJson(Map<String, dynamic> j) =>
-      ReleaseAsset(name: j['name'] as String, url: j['browser_download_url'] as String, size: j['size'] as int? ?? 0);
+  factory ReleaseAsset.fromJson(Map<String, dynamic> j) => ReleaseAsset(
+    name: j['name'] as String,
+    url: j['browser_download_url'] as String,
+    size: j['size'] as int? ?? 0,
+    sha256: parseSha256Digest(j['digest'] as String?),
+  );
 
   final String name;
   final String url;
   final int size;
+
+  /// Lowercase hex SHA-256 that GitHub computed for the upload, or null when it doesn't report one.
+  final String? sha256;
 }
 
 class ReleaseInfo {
@@ -50,7 +57,7 @@ class ReleaseInfo {
 
   final String tag;
 
-  /// Markdown body of the release (GitHub's generated notes).
+  /// Markdown body of the release (written by the release workflow).
   final String notes;
   final String pageUrl;
   final List<ReleaseAsset> assets;
@@ -98,13 +105,14 @@ ReleaseAsset? pickApk(List<ReleaseAsset> assets, List<String> abis) {
   return null;
 }
 
-/// Parses `sha256sum` output (`<hex>  <file>` per line) into file name → lowercase hex.
-Map<String, String> parseSha256Sums(String text) => {
-  for (final m in RegExp(r'^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$', multiLine: true).allMatches(text))
-    m.group(2)!: m.group(1)!.toLowerCase(),
-};
+/// The hex from a GitHub asset digest (`sha256:<hex>`), or null for a missing or other kind of digest.
+String? parseSha256Digest(String? digest) {
+  final m = RegExp(r'^sha256:([0-9a-fA-F]{64})$').firstMatch(digest ?? '');
+  return m?.group(1)!.toLowerCase();
+}
 
-/// Turns GitHub's generated release notes into short plain text for the update sheet.
+/// Turns the release notes into short plain text for the update sheet. Also copes with the older
+/// GitHub-generated notes ("What's Changed", "by @user in" plus a PR link).
 String cleanReleaseNotes(String markdown) {
   final lines = <String>[];
   for (var line in markdown.replaceAll('\r\n', '\n').split('\n')) {
@@ -116,7 +124,8 @@ String cleanReleaseNotes(String markdown) {
         .replaceFirst(RegExp(r' by @\S+ in https://\S+$'), '')
         .replaceAll('**', '')
         .trimRight();
-    if (line == "What's Changed") continue;
+    // The sheet has its own "What's new" heading.
+    if (line == "What's new" || line == "What's Changed") continue;
     if (line.isEmpty && (lines.isEmpty || lines.last.isEmpty)) continue;
     lines.add(line);
   }
@@ -173,7 +182,7 @@ class Updater {
 
   Future<Directory> _dir() async => Directory('${(await getTemporaryDirectory()).path}/updates');
 
-  /// Downloads the update's APK and checks it against the release's SHA256SUMS.txt. Returns the file path.
+  /// Downloads the update's APK and checks it against the SHA-256 digest GitHub reports. Returns the file path.
   Future<String> download(
     AvailableUpdate update, {
     void Function(int received, int total)? onProgress,
@@ -184,7 +193,7 @@ class Updater {
     final path = '${dir.path}/${update.apk.name}';
     try {
       await _dio.download(update.apk.url, path, onReceiveProgress: onProgress, cancelToken: cancelToken);
-      final expected = await _expectedHash(update, cancelToken);
+      final expected = update.apk.sha256;
       if (expected != null) {
         final actual = await compute(_sha256Of, path);
         if (actual != expected) throw UpdateException('HASH_MISMATCH', 'The download is damaged');
@@ -198,20 +207,6 @@ class Updater {
       await _deleteQuietly(path);
       rethrow;
     }
-  }
-
-  /// The checksum from SHA256SUMS.txt, or null for a release that doesn't publish one.
-  Future<String?> _expectedHash(AvailableUpdate update, CancelToken? cancelToken) async {
-    final sums = update.release.assets.where((a) => a.name == 'SHA256SUMS.txt').firstOrNull;
-    if (sums == null) return null;
-    final res = await _dio.get<String>(
-      sums.url,
-      options: Options(responseType: ResponseType.plain),
-      cancelToken: cancelToken,
-    );
-    final expected = parseSha256Sums(res.data ?? '')[update.apk.name];
-    if (expected == null) throw UpdateException('HASH_MISMATCH', 'No checksum for ${update.apk.name}');
-    return expected;
   }
 
   /// Hands the APK to Android's installer, which asks the user to confirm. On success the app is replaced.

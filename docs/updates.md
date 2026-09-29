@@ -14,7 +14,7 @@ The app updates itself from GitHub Releases (the app isn't on the Play Store). T
    - The APK is chosen by `pickApk`: the first of `Build.SUPPORTED_ABIS` with an asset ending `-<abi>.apk`.
    - Unauthenticated API calls are limited to 60 per hour per IP, which is plenty for one call per launch.
 3. **Ask first:** `showUpdateSheet` (`lib/features/update/update_sheet.dart`) shows the version, size and cleaned-up notes (`cleanReleaseNotes`), with Skip this version / Later / Update.
-4. **Download:** `dio` downloads to `<temp>/updates/`. The APK is then checked against `SHA256SUMS.txt` (if the release has one). The download runs in `UpdateController`, so closing the sheet doesn't stop it; Settings → "Check for updates" shows progress and reopens the sheet.
+4. **Download:** `dio` downloads to `<temp>/updates/`. The APK is then checked against the SHA-256 `digest` GitHub's API reports for that asset (`sha256:<hex>`); if a release had none, the check is skipped and Android's signature check still applies. The download runs in `UpdateController`, so closing the sheet doesn't stop it; Settings → "Check for updates" shows progress and reopens the sheet.
 5. **Install:** `UpdateChannel.kt` writes the APK into a `PackageInstaller` session and commits it. On `STATUS_PENDING_USER_ACTION` it starts the system confirmation screen.
    - The first time, Android asks the user to turn on "Allow from this source". The system handles that; the app doesn't need to.
    - On success the app process is replaced.
@@ -37,12 +37,11 @@ Changing any of these breaks updates for everyone already installed:
 
 - The tag is `vMAJOR.MINOR.PATCH`, and CI passes it as `--build-name`.
 - The APK assets are named `…-<abi>.apk` with Android ABI names (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
-- `SHA256SUMS.txt` is in `sha256sum` format and lists each APK by its asset name.
 - Every release is signed with the same key.
 
 ## Testing
 
-- **Unit tests:** `test/updater_test.dart` covers version comparison, ABI choice, `SHA256SUMS` parsing and notes cleanup, against `test/fixtures/github_release.json` (the trimmed v0.0.3 release).
+- **Unit tests:** `test/updater_test.dart` covers version comparison, ABI choice, digest parsing and notes cleanup, against `test/fixtures/github_release.json` (the trimmed v0.0.3 release).
 - **On a device:** build a lower version so there's something to update to. `kDebugMode` skips the launch check, so use a release build:
   ```bash
   flutter build apk --release --build-name=0.0.1 --build-number=1
