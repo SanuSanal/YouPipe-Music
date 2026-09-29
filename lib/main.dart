@@ -77,7 +77,8 @@ class _YouPipeAppState extends ConsumerState<YouPipeApp> {
     ref.watch(downloadManagerProvider);
     ref.watch(autoBrowserProvider);
     return MaterialApp.router(
-      title: 'YouPipe Music',
+      // Short name shown by the system (recents); in-app branding stays "YouPipe Music".
+      title: 'YP Music',
       debugShowCheckedModeBanner: false,
       theme: buildYtmTheme(),
       darkTheme: buildYtmTheme(),

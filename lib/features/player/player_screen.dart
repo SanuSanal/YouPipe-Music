@@ -113,32 +113,36 @@ class PlayerScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _Pill(
-                            icon: liked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                            label: liked ? 'Liked' : 'Like',
-                            onTap: () => ref.read(accountActionsProvider).setLiked(song, !liked),
-                          ),
-                          _Pill(
-                            icon: Icons.playlist_add,
-                            label: 'Save',
-                            onTap: () => showSaveToPlaylist(context, ref, [song]),
-                          ),
-                          _Pill(
-                            icon: Icons.share_outlined,
-                            label: 'Share',
-                            onTap: () => SharePlus.instance.share(ShareParams(text: shareUrl(song))),
-                          ),
-                          if (song.album != null)
+                    // Action pills sit on the left edge, like YouTube Music.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
                             _Pill(
-                              icon: Icons.album_outlined,
-                              label: 'Album',
-                              onTap: () => openAlbum(context, ref, song.album!.id),
+                              icon: liked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                              label: liked ? 'Liked' : 'Like',
+                              onTap: () => ref.read(accountActionsProvider).setLiked(song, !liked),
                             ),
-                        ],
+                            _Pill(
+                              icon: Icons.playlist_add,
+                              label: 'Save',
+                              onTap: () => showSaveToPlaylist(context, ref, [song]),
+                            ),
+                            _Pill(
+                              icon: Icons.share_outlined,
+                              label: 'Share',
+                              onTap: () => SharePlus.instance.share(ShareParams(text: shareUrl(song))),
+                            ),
+                            if (song.album != null)
+                              _Pill(
+                                icon: Icons.album_outlined,
+                                label: 'Album',
+                                onTap: () => openAlbum(context, ref, song.album!.id),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),

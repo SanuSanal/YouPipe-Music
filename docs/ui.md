@@ -3,7 +3,7 @@
 ## Product rule: look exactly like YouTube Music, but with YouPipe branding
 
 - Screens, layouts, interactions and wording follow the **YouTube Music Android app**. When in doubt, match YTM.
-- **App name:** "YouPipe Music" (`applicationId`/namespace `com.youpipe.music`).
+- **App name:** "YouPipe Music" inside the app (wordmark, About). The system-facing name is the short **"YP Music"**: `android:label` in the manifest (launcher, app drawer, app info, Android Auto) and `MaterialApp.title` (recents). `applicationId`/namespace is `com.youpipe.music`.
 - **Logo:** YTM's red circle with a white ring, but with a **white cylinder (pipe) in 3/4 view** in place of the play triangle. Sources are in `assets/branding/*.svg`:
   - `logo.svg`: the badge.
   - `logo_foreground.svg`: the adaptive-icon foreground, scaled into the safe zone.
@@ -57,6 +57,6 @@
 | `CollectionHeader`, `TintedPage`, `ArtworkTint` | Album/playlist header and page: artwork-tinted gradient, the top bar turns solid and shows the title after scrolling |
 | `LoadingView`, `ErrorView`, `EmptyView`, `songCount()` | Standard states and pluralisation |
 
-- **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video isn't implemented yet), Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
+- **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video isn't implemented yet), left-aligned Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
 - **Artist page:** `SliverAppBar` with `FlexibleSpaceBar`, where the full-bleed image collapses into a solid bar with the name.
 - **Search:** suggestions highlight the part you haven't typed yet; search history is shown when the field is empty; filter chips use the `SearchFilter` params.
