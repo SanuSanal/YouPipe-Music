@@ -1,0 +1,372 @@
+import 'dart:async';
+
+import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'data/db/app_database.dart';
+import 'data/library_repository.dart';
+import 'data/stream_resolver.dart';
+import 'innertube/innertube.dart';
+import 'player/audio_handler.dart';
+
+// ---------------------------------------------------------------------------------------------
+// Core services (created in main() and injected with overrides)
+// ---------------------------------------------------------------------------------------------
+
+final innerTubeProvider = Provider<InnerTube>((ref) => throw UnimplementedError('overridden in main'));
+final streamResolverProvider = Provider<StreamResolver>((ref) => throw UnimplementedError('overridden in main'));
+final audioHandlerProvider = Provider<YouPipeAudioHandler>((ref) => throw UnimplementedError('overridden in main'));
+final databaseProvider = Provider<AppDatabase>((ref) => throw UnimplementedError('overridden in main'));
+final prefsProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError('overridden in main'));
+
+final libraryProvider = Provider<LibraryRepository>((ref) => LibraryRepository(ref.watch(databaseProvider)));
+
+// ---------------------------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------------------------
+
+@immutable
+class AppSettings {
+  const AppSettings({this.quality = AudioQuality.high, this.hl = 'en', this.gl = 'US', this.saveHistory = true});
+
+  final AudioQuality quality;
+  final String hl;
+  final String gl;
+  final bool saveHistory;
+
+  AppSettings copyWith({AudioQuality? quality, String? hl, String? gl, bool? saveHistory}) => AppSettings(
+    quality: quality ?? this.quality,
+    hl: hl ?? this.hl,
+    gl: gl ?? this.gl,
+    saveHistory: saveHistory ?? this.saveHistory,
+  );
+}
+
+final settingsProvider = NotifierProvider<SettingsController, AppSettings>(SettingsController.new);
+
+class SettingsController extends Notifier<AppSettings> {
+  SharedPreferences get _prefs => ref.read(prefsProvider);
+
+  @override
+  AppSettings build() {
+    final p = ref.watch(prefsProvider);
+    final s = AppSettings(
+      quality: AudioQuality.values.byName(p.getString('quality') ?? AudioQuality.high.name),
+      hl: p.getString('hl') ?? 'en',
+      gl: p.getString('gl') ?? 'US',
+      saveHistory: p.getBool('saveHistory') ?? true,
+    );
+    _apply(s);
+    return s;
+  }
+
+  void _apply(AppSettings s) {
+    ref.read(innerTubeProvider)
+      ..hl = s.hl
+      ..gl = s.gl;
+    ref.read(streamResolverProvider)
+      ..hl = s.hl
+      ..gl = s.gl
+      ..quality = s.quality;
+  }
+
+  Future<void> update(AppSettings s) async {
+    state = s;
+    _apply(s);
+    await _prefs.setString('quality', s.quality.name);
+    await _prefs.setString('hl', s.hl);
+    await _prefs.setString('gl', s.gl);
+    await _prefs.setBool('saveHistory', s.saveHistory);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Player
+// ---------------------------------------------------------------------------------------------
+
+final queueStateProvider = StreamProvider<QueueState>((ref) {
+  final handler = ref.watch(audioHandlerProvider);
+  final controller = StreamController<QueueState>();
+  void emit() => controller.add(handler.queueState.value);
+  handler.queueState.addListener(emit);
+  emit();
+  ref.onDispose(() {
+    handler.queueState.removeListener(emit);
+    controller.close();
+  });
+  return controller.stream;
+});
+
+final playbackStateProvider = StreamProvider<PlaybackState>((ref) => ref.watch(audioHandlerProvider).playbackState);
+
+final currentSongProvider = Provider<SongItem?>((ref) => ref.watch(queueStateProvider).value?.current);
+
+final positionProvider = StreamProvider<Duration>((ref) => ref.watch(audioHandlerProvider).positionStream);
+
+final playerActionsProvider = Provider<PlayerActions>((ref) => PlayerActions(ref));
+
+/// High-level "play this" actions that combine the audio handler with InnerTube (radio, queues).
+class PlayerActions {
+  PlayerActions(this._ref);
+
+  final Ref _ref;
+
+  YouPipeAudioHandler get _handler => _ref.read(audioHandlerProvider);
+  InnerTube get _yt => _ref.read(innerTubeProvider);
+
+  /// Endless queue from a watch endpoint's up-next panel.
+  QueueExtender _radioExtender(WatchEndpoint endpoint, {bool skipFirst = false}) {
+    String? continuation;
+    String? playlistId = endpoint.playlistId;
+    var first = true;
+    return () async {
+      final NextPage page;
+      if (first) {
+        page = await _yt.next(endpoint);
+      } else if (continuation != null) {
+        page = await _yt.nextContinuation(continuation!, playlistId: playlistId);
+      } else {
+        return const [];
+      }
+      continuation = page.continuation;
+      playlistId = page.playlistId ?? playlistId;
+      final items = first && skipFirst ? page.items.skip(1).toList() : page.items;
+      first = false;
+      return items;
+    };
+  }
+
+  /// Tapping a single song: play it now, then keep going with its radio (like YouTube Music).
+  Future<void> playSong(SongItem song) => _handler.playSongs(
+    [song],
+    title: 'Radio',
+    extender: _radioExtender(
+      WatchEndpoint(videoId: song.videoId, playlistId: 'RDAMVM${song.videoId}'),
+      skipFirst: true,
+    ),
+  );
+
+  Future<void> startRadio(SongItem song) => playSong(song);
+
+  /// Play a known list (album, playlist, library) from [index].
+  Future<void> playList(List<SongItem> songs, {int index = 0, bool shuffle = false, String? title}) =>
+      _handler.playSongs(songs, startIndex: index, shuffle: shuffle, title: title);
+
+  /// Artist shuffle/mix buttons and radio cards.
+  Future<void> playEndpoint(WatchEndpoint endpoint, {String? title}) async {
+    final extender = _radioExtender(endpoint);
+    final first = await extender();
+    await _handler.playSongs(first, title: title, extender: extender);
+  }
+
+  /// Plays a YouTube playlist (or album) by id without opening its page.
+  Future<void> playPlaylistId(String playlistId, {bool shuffle = false, String? title}) async {
+    final page = await _yt.playlist(playlistId);
+    await playList(page.songs, shuffle: shuffle, title: title ?? page.playlist.title);
+  }
+
+  void playNext(List<SongItem> songs) => _handler.playNext(songs);
+  void addToQueue(List<SongItem> songs) => _handler.addToQueue(songs);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Data
+// ---------------------------------------------------------------------------------------------
+
+final albumProvider = FutureProvider.autoDispose.family<AlbumPage, String>(
+  (ref, id) => ref.watch(innerTubeProvider).album(id),
+);
+
+final artistProvider = FutureProvider.autoDispose.family<ArtistPage, String>(
+  (ref, id) => ref.watch(innerTubeProvider).artist(id),
+);
+
+final browseSectionsProvider = FutureProvider.autoDispose.family<SectionsPage, BrowseEndpoint>(
+  (ref, ep) => ref.watch(innerTubeProvider).browseSections(ep),
+);
+
+final exploreProvider = FutureProvider<ExplorePage>((ref) => ref.watch(innerTubeProvider).explore());
+
+final searchSuggestionsProvider = FutureProvider.autoDispose.family<SearchSuggestions, String>((ref, input) async {
+  if (input.trim().isEmpty) return const SearchSuggestions(queries: [], items: []);
+  // Debounce typing.
+  var cancelled = false;
+  ref.onDispose(() => cancelled = true);
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+  if (cancelled) throw StateError('cancelled');
+  return ref.watch(innerTubeProvider).searchSuggestions(input);
+});
+
+/// Watch-next info for a song; source of its lyrics and related browse ids.
+final nextInfoProvider = FutureProvider.autoDispose.family<NextPage, String>(
+  (ref, videoId) => ref.watch(innerTubeProvider).next(WatchEndpoint(videoId: videoId)),
+);
+
+final lyricsProvider = FutureProvider.autoDispose.family<Lyrics?, String>((ref, videoId) async {
+  final ep = (await ref.watch(nextInfoProvider(videoId).future)).lyricsEndpoint;
+  return ep == null ? null : ref.watch(innerTubeProvider).lyrics(ep);
+});
+
+final relatedProvider = FutureProvider.autoDispose.family<List<Section>, String>((ref, videoId) async {
+  final ep = (await ref.watch(nextInfoProvider(videoId).future)).relatedEndpoint;
+  return ep == null ? const [] : ref.watch(innerTubeProvider).related(ep);
+});
+
+/// Paged state shared by home, search results and playlists.
+@immutable
+class Paged<T> {
+  const Paged(this.value, {this.continuation, this.loadingMore = false});
+
+  final T value;
+  final String? continuation;
+  final bool loadingMore;
+
+  bool get hasMore => continuation != null;
+}
+
+final homeProvider = AsyncNotifierProvider<HomeController, Paged<HomePage>>(HomeController.new);
+
+class HomeController extends AsyncNotifier<Paged<HomePage>> {
+  BrowseEndpoint? _chip;
+  BrowseEndpoint? get selectedChip => _chip;
+
+  @override
+  Future<Paged<HomePage>> build() async {
+    final yt = ref.watch(innerTubeProvider);
+    await yt.ensureVisitorData();
+    final page = await yt.home(chip: _chip);
+    return Paged(page, continuation: page.continuation);
+  }
+
+  Future<void> selectChip(HomeChip chip) async {
+    _chip = chip.endpoint == _chip ? null : chip.endpoint;
+    state = const AsyncLoading();
+    ref.invalidateSelf();
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(Paged(current.value, continuation: current.continuation, loadingMore: true));
+    try {
+      final more = await ref.read(innerTubeProvider).sectionsContinuation(current.continuation!);
+      final page = current.value;
+      state = AsyncData(
+        Paged(
+          HomePage(chips: page.chips, sections: [...page.sections, ...more.sections], continuation: more.continuation),
+          continuation: more.continuation,
+        ),
+      );
+    } catch (e) {
+      state = AsyncData(Paged(current.value, continuation: current.continuation));
+    }
+  }
+}
+
+typedef SearchQuery = ({String query, SearchFilter? filter});
+
+final searchResultsProvider = AsyncNotifierProvider.autoDispose
+    .family<SearchController, Paged<SearchPage>, SearchQuery>(SearchController.new);
+
+class SearchController extends AsyncNotifier<Paged<SearchPage>> {
+  SearchController(this.arg);
+
+  final SearchQuery arg;
+
+  @override
+  Future<Paged<SearchPage>> build() async {
+    final page = await ref.watch(innerTubeProvider).search(arg.query, filter: arg.filter);
+    return Paged(page, continuation: page.continuation);
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(Paged(current.value, continuation: current.continuation, loadingMore: true));
+    try {
+      final more = await ref.read(innerTubeProvider).searchContinuation(current.continuation!);
+      state = AsyncData(
+        Paged(
+          SearchPage(items: [...current.value.items, ...more.items], continuation: more.continuation),
+          continuation: more.continuation,
+        ),
+      );
+    } catch (e) {
+      state = AsyncData(Paged(current.value, continuation: current.continuation));
+    }
+  }
+}
+
+final playlistProvider = AsyncNotifierProvider.autoDispose.family<PlaylistController, Paged<PlaylistPage>, String>(
+  PlaylistController.new,
+);
+
+class PlaylistController extends AsyncNotifier<Paged<PlaylistPage>> {
+  PlaylistController(this.playlistId);
+
+  final String playlistId;
+  final related = <Section>[];
+
+  @override
+  Future<Paged<PlaylistPage>> build() async {
+    final page = await ref.watch(innerTubeProvider).playlist(playlistId);
+    return Paged(page, continuation: page.continuation);
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(Paged(current.value, continuation: current.continuation, loadingMore: true));
+    try {
+      final more = await ref.read(innerTubeProvider).playlistContinuation(current.continuation!);
+      related.addAll(more.sections);
+      final p = current.value;
+      state = AsyncData(
+        Paged(
+          PlaylistPage(
+            playlist: p.playlist,
+            songs: [...p.songs, ...more.songs],
+            description: p.description,
+            secondSubtitle: p.secondSubtitle,
+            continuation: more.continuation,
+          ),
+          continuation: more.continuation,
+        ),
+      );
+    } catch (e) {
+      state = AsyncData(Paged(current.value, continuation: current.continuation));
+    }
+  }
+
+  /// All songs, following continuations (for play/shuffle of long playlists).
+  Future<List<SongItem>> allSongs() async {
+    while (state.value?.hasMore == true && state.value!.value.songs.length < 1000) {
+      final before = state.value!.value.songs.length;
+      await loadMore();
+      if (state.value!.value.songs.length == before) break;
+    }
+    return state.value?.value.songs ?? const [];
+  }
+}
+
+// Library streams ------------------------------------------------------------------------------
+
+final isLikedProvider = StreamProvider.autoDispose.family<bool, String>(
+  (ref, id) => ref.watch(libraryProvider).watchIsLiked(id),
+);
+final isSavedProvider = StreamProvider.autoDispose.family<bool, YTItem>(
+  (ref, item) => ref.watch(libraryProvider).watchIsSaved(item),
+);
+final likedSongsProvider = StreamProvider<List<SongItem>>((ref) => ref.watch(libraryProvider).watchLikedSongs());
+final historyProvider = StreamProvider<List<SongItem>>((ref) => ref.watch(libraryProvider).watchHistory());
+final savedAlbumsProvider = StreamProvider<List<AlbumItem>>((ref) => ref.watch(libraryProvider).watchSavedAlbums());
+final savedArtistsProvider = StreamProvider<List<ArtistItem>>((ref) => ref.watch(libraryProvider).watchSavedArtists());
+final savedPlaylistsProvider = StreamProvider<List<PlaylistItem>>(
+  (ref) => ref.watch(libraryProvider).watchSavedPlaylists(),
+);
+final localPlaylistsProvider = StreamProvider<List<LocalPlaylistSummary>>(
+  (ref) => ref.watch(libraryProvider).watchLocalPlaylists(),
+);
+final searchHistoryProvider = StreamProvider<List<String>>((ref) => ref.watch(libraryProvider).watchSearchHistory());

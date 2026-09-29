@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 432 432" width="432" height="432">
+  <!-- Android 13+ themed icon: single-color silhouette; the pipe bore is punched out. -->
+  <defs>
+    <mask id="bore">
+      <rect width="192" height="192" fill="#FFFFFF"/>
+      <ellipse cx="121" cy="96" rx="7" ry="16" fill="#000000"/>
+    </mask>
+  </defs>
+  <g transform="translate(216 216) scale(1.5) translate(-96 -96)">
+    <circle cx="96" cy="96" r="57" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+    <g mask="url(#bore)">
+      <path d="M68 74 H121 A11 22 0 0 1 121 118 H68 A11 22 0 0 1 68 74 Z" fill="#FFFFFF"/>
+      <ellipse cx="121" cy="96" rx="11" ry="22" fill="#FFFFFF"/>
+    </g>
+  </g>
+</svg>
