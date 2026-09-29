@@ -19,13 +19,18 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   final innerTube = InnerTube(visitorData: prefs.getString('visitorData'));
   final resolver = StreamResolver();
-  final audioHandler = await AudioService.init(
+  final audioHandler = await AudioService.init<YouPipeAudioHandler>(
     builder: () => YouPipeAudioHandler(resolver),
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.youpipe.music.playback',
       androidNotificationChannelName: 'Playback',
       androidNotificationIcon: 'drawable/ic_stat_youpipe',
       androidNotificationOngoing: true,
+      androidBrowsableRootExtras: {
+        AndroidContentStyle.supportedKey: true,
+        AndroidContentStyle.browsableHintKey: AndroidContentStyle.listItemHintValue,
+        AndroidContentStyle.playableHintKey: AndroidContentStyle.listItemHintValue,
+      },
     ),
   );
 
@@ -70,6 +75,7 @@ class _YouPipeAppState extends ConsumerState<YouPipeApp> {
     ref.watch(settingsProvider);
     ref.watch(audioEffectsProvider);
     ref.watch(downloadManagerProvider);
+    ref.watch(autoBrowserProvider);
     return MaterialApp.router(
       title: 'YouPipe Music',
       debugShowCheckedModeBanner: false,

@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import '../data/sponsorblock.dart';
 import '../data/stream_resolver.dart';
 import '../innertube/models.dart';
+import 'auto_browser.dart';
 
 enum QueueRepeatMode { off, all, one }
 
@@ -78,6 +79,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   final equalizer = AndroidEqualizer();
   final loudness = AndroidLoudnessEnhancer();
   late final _player = AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [loudness, equalizer]));
+
+  /// Android Auto browse tree; set once the app's services exist.
+  AutoBrowser? browser;
 
   /// Offline copies are played instead of streaming when available.
   LocalFileLookup? localFile;
@@ -388,6 +392,22 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       ),
     );
   }
+
+  // Android Auto / media browser ------------------------------------------------------------
+
+  @override
+  Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) async =>
+      await browser?.children(parentMediaId) ?? const [];
+
+  @override
+  Future<void> playFromMediaId(String mediaId, [Map<String, dynamic>? extras]) async => browser?.play(mediaId);
+
+  @override
+  Future<List<MediaItem>> search(String query, [Map<String, dynamic>? extras]) async =>
+      await browser?.search(query) ?? const [];
+
+  @override
+  Future<void> playFromSearch(String query, [Map<String, dynamic>? extras]) async => browser?.playFromSearch(query);
 
   @override
   Future<void> play() async {

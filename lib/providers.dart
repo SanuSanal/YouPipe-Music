@@ -13,6 +13,7 @@ import 'data/library_repository.dart';
 import 'data/stream_resolver.dart';
 import 'innertube/innertube.dart';
 import 'player/audio_handler.dart';
+import 'player/auto_browser.dart';
 
 // ---------------------------------------------------------------------------------------------
 // Core services (created in main() and injected with overrides)
@@ -44,6 +45,20 @@ final downloadedIdsProvider = Provider<Set<String>>(
 final downloadStatusProvider = Provider.family<DownloadStatus?, String>((ref, videoId) {
   final all = ref.watch(downloadsProvider).value ?? const <DownloadEntry>[];
   return all.where((d) => d.song.videoId == videoId).firstOrNull?.row.status;
+});
+
+/// Hooks the Android Auto browse tree into the audio handler (watched from the app root).
+final autoBrowserProvider = Provider<AutoBrowser>((ref) {
+  final actions = ref.watch(playerActionsProvider);
+  final browser = AutoBrowser(
+    yt: ref.watch(innerTubeProvider),
+    library: ref.watch(libraryProvider),
+    downloads: ref.watch(downloadManagerProvider),
+    playSong: actions.playSong,
+    playList: (songs, index, title) => actions.playList(songs, index: index, title: title),
+  );
+  ref.read(audioHandlerProvider).browser = browser;
+  return browser;
 });
 
 final sponsorBlockProvider = Provider<SponsorBlockService>((ref) => SponsorBlockService());
