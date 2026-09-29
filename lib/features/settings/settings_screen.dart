@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/account.dart';
 import '../../data/stream_resolver.dart';
+import '../../data/updater.dart';
+import '../update/update_sheet.dart';
 import '../../ui/widgets/thumbnail.dart';
 import '../../providers.dart';
 import '../../ui/theme/ytm_theme.dart';
@@ -173,11 +175,24 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
           const _Header('About'),
-          const ListTile(
-            leading: Icon(Icons.info_outline, color: YtmColors.textPrimary),
-            title: Text('YouPipe Music'),
-            subtitle: Text('Ad-free YouTube Music client. Streams via NewPipeExtractor.'),
+          ListTile(
+            leading: const Icon(Icons.info_outline, color: YtmColors.textPrimary),
+            title: const Text('YouPipe Music'),
+            subtitle: Text(
+              'Version ${ref.watch(appInfoProvider).value?.versionName ?? '…'}\n'
+              'Ad-free YouTube Music client. Streams via NewPipeExtractor.',
+            ),
+            isThreeLine: true,
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.update, color: YtmColors.textPrimary),
+            title: const Text('Check for updates automatically'),
+            subtitle: const Text('Looks for a new version on GitHub when the app opens'),
+            value: s.autoUpdateCheck,
+            activeTrackColor: YtmColors.brandRed,
+            onChanged: (v) => controller.update(s.copyWith(autoUpdateCheck: v)),
+          ),
+          const _CheckForUpdatesTile(),
         ],
       ),
     );
@@ -220,6 +235,53 @@ class _AccountTile extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+class _CheckForUpdatesTile extends ConsumerWidget {
+  const _CheckForUpdatesTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(updateProvider);
+    final subtitle = switch (state) {
+      UpdateChecking() => 'Checking…',
+      UpdateAvailable(:final update) => 'Version ${update.version} is available',
+      UpdateDownloading(:final update, :final progress) =>
+        'Downloading ${update.version}${progress == null ? '' : ' (${(progress * 100).round()}%)'}',
+      UpdateInstalling(:final update) => 'Installing ${update.version}…',
+      UpdateFailed() => "Couldn't update. Tap to see why",
+      UpdateIdle() => null,
+    };
+    return ListTile(
+      leading: const Icon(Icons.system_update_outlined, color: YtmColors.textPrimary),
+      title: const Text('Check for updates'),
+      subtitle: subtitle == null ? null : Text(subtitle),
+      onTap: state is UpdateChecking
+          ? null
+          : () async {
+              final current = switch (state) {
+                UpdateAvailable(:final update) ||
+                UpdateDownloading(:final update) ||
+                UpdateInstalling(:final update) => update,
+                UpdateFailed(:final update) => update,
+                _ => null,
+              };
+              try {
+                final update = current ?? await ref.read(updateProvider.notifier).checkNow();
+                if (!context.mounted) return;
+                if (update == null) {
+                  showSnack(context, "You're on the latest version");
+                } else {
+                  await showUpdateSheet(context, update);
+                }
+              } on UpdateException catch (e) {
+                if (context.mounted) {
+                  showSnack(context, e.code == 'NO_APK' ? 'No update for this device' : "Couldn't check for updates");
+                }
+              }
+            },
     );
   }
 }

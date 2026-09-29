@@ -15,7 +15,7 @@ val keyProperties =
     }
 
 fun signingValue(env: String, property: String): String? =
-    System.getenv(env)?.takeIf { it.isNotBlank() } ?: keyProperties.getProperty(property)
+    System.getenv(env)?.takeIf { it.isNotBlank() } ?: keyProperties.getProperty(property)?.takeIf { it.isNotBlank() }
 
 val releaseStoreFile = signingValue("ANDROID_KEYSTORE_PATH", "storeFile")
 

@@ -15,7 +15,7 @@
   - Offline downloads.
   - Android Auto browsing.
   - Google sign-in with account library and like/save/subscribe sync, plus "Save to library".
-- **Releases:** signed APKs are published to GitHub Releases by a tag-triggered workflow (see [release.md](release.md)).
+- **Releases:** signed APKs are published to GitHub Releases by a tag-triggered workflow (see [release.md](release.md)), and the app updates itself from them (see [updates.md](updates.md)).
 
 ## Next (not started)
 

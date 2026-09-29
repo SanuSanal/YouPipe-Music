@@ -17,6 +17,8 @@ The workflow:
 
 A failed run leaves no release. Delete and re-push the tag to retry.
 
+**Installed apps update themselves from these releases** (see [updates.md](updates.md)). The tag format, the `-<abi>.apk` asset names, `SHA256SUMS.txt` and the signing key are a contract with the updater; don't change them.
+
 ## Signing
 
 - `android/app/build.gradle.kts` signs release builds with the key given by `ANDROID_KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` (env vars), or else by `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`; gitignored). With neither, it falls back to the debug key.

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/sponsorblock.dart';
 import '../../features/player/mini_player.dart';
 import '../../features/player/player_screen.dart';
+import '../../features/update/update_sheet.dart';
 import '../../innertube/models.dart';
 import '../../providers.dart';
 import '../navigation.dart';
@@ -33,6 +34,11 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
     super.initState();
     _skips = ref.read(audioHandlerProvider).skippedSegments.stream.listen((_) {
       if (mounted) showSnack(context, 'Skipped non-music section');
+    });
+    // Look for a new release once the app has settled, so the check doesn't compete with startup.
+    Future.delayed(const Duration(seconds: 3), () async {
+      final update = await ref.read(updateProvider.notifier).checkOnLaunch();
+      if (update != null && mounted) unawaited(showUpdateSheet(context, update));
     });
   }
 
