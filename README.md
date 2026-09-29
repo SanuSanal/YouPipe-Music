@@ -1,19 +1,126 @@
+<div align="center">
+
+<img src="assets/branding/logo_1024.png" alt="YouPipe Music logo" width="128" />
+
 # YouPipe Music
 
-An ad-free YouTube Music client for Android, built with Flutter. The UI follows the YouTube Music app.
+**Your music, without the ads.**<br/>
+A free, ad-free YouTube Music client for Android, with background playback, offline downloads and synced lyrics.
 
-## How it works
+[![Latest release](https://img.shields.io/github/v/release/SanuSanal/YouPipe-Music?style=for-the-badge&color=FF0033&label=Release)](https://github.com/SanuSanal/YouPipe-Music/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/SanuSanal/YouPipe-Music/total?style=for-the-badge&color=212121&label=Downloads)](https://github.com/SanuSanal/YouPipe-Music/releases)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-download)
+[![Built with Flutter](https://img.shields.io/badge/Built%20with-Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 
-- **Browse, search, radio, lyrics:** `lib/innertube/` is a pure-Dart client for YouTube Music's internal InnerTube API (`WEB_REMIX`).
-- **Audio streams:** resolved on Android by [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) through the `youpipe/stream_extractor` method channel (`android/app/src/main/kotlin/com/youpipe/music/StreamExtractorChannel.kt`). NewPipeExtractor takes care of signature deciphering and YouTube's PO-token restrictions.
-- **Playback:** `just_audio` behind `audio_service`, which provides background playback, the notification and lockscreen controls.
-- **Library:** liked songs, history, saved items and your own playlists live in a local SQLite database (`drift`).
+<a href="https://github.com/SanuSanal/YouPipe-Music/releases/latest">
+  <img src="https://img.shields.io/badge/Get%20it%20on-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Get it on GitHub" height="48" />
+</a>
 
-## Docs
+</div>
 
-Architecture and design decisions live in [`docs/`](docs/README.md). Agents (and humans) should read [`AGENTS.md`](AGENTS.md) first.
+---
 
-## Layout
+## ✨ Features
+
+**Listen**
+- Everything from YouTube Music: songs, albums, artists, playlists, charts, moods and new releases
+- **No ads**, ever
+- Background playback with notification and lock-screen controls
+- Endless radio and "Up next" from any song
+- Shuffle, repeat and queue editing
+
+**Look & feel**
+- A familiar interface modelled on the YouTube Music app, so there's nothing new to learn
+- Dark theme, with album and playlist pages tinted in colours taken from the artwork
+
+**Lyrics**
+- Synced, line-by-line lyrics (via [LRCLIB](https://lrclib.net)), with a fallback to YouTube Music lyrics
+
+**Sound**
+- Choose your audio quality
+- Built-in equalizer and loudness boost
+- Playback speed control
+- Skip the non-music intros, skits and outros in music videos (via [SponsorBlock](https://sponsor.ajay.app))
+- Sleep timer
+
+**Offline & library**
+- Download songs for offline listening
+- Your own library on the device: liked songs, playlists, saved albums and listening history
+- **Optional** sign-in to YouTube Music to bring in your account's library, likes and personal recommendations. Everything works without an account too
+
+**In the car**
+- Android Auto support
+
+---
+
+## 📥 Download
+
+Grab the latest APK from the **[Releases page](https://github.com/SanuSanal/YouPipe-Music/releases/latest)** and install it on your phone.
+
+> [!NOTE]
+> YouPipe Music isn't on the Play Store. Android may ask you to allow installs from your browser or file manager the first time.
+
+<!--
+## 📸 Screenshots
+
+<p align="center">
+  <img src="assets/screenshots/home.png" width="200" />
+  <img src="assets/screenshots/player.png" width="200" />
+  <img src="assets/screenshots/lyrics.png" width="200" />
+  <img src="assets/screenshots/library.png" width="200" />
+</p>
+-->
+
+---
+
+## 🔒 Privacy
+
+- No ads, no trackers, no analytics.
+- Your library, history and downloads stay on your device.
+- Signing in is optional. You sign in on Google's own page, and YouPipe Music never sees your password.
+
+---
+
+## ❤️ Support the project
+
+YouPipe Music is free and always will be. If it made your day a little better, you can buy me a coffee. Every bit helps keep the app alive and updated.
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/sanalm555k">
+    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=sanalm555k&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="48" />
+  </a>
+  &nbsp;
+  <a href="https://www.paypal.com/donate/?hosted_button_id=HBGNBZL5VRMTY">
+    <img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal" height="48" />
+  </a>
+  &nbsp;
+  <a href="https://revolut.me/sanalmyfyj">
+    <img src="https://img.shields.io/badge/Send-Revolut-191C1F?style=for-the-badge&logo=revolut&logoColor=white" alt="Send with Revolut" height="48" />
+  </a>
+</p>
+
+A ⭐ on this repo helps too!
+
+---
+
+## 🙏 Credits
+
+YouPipe Music stands on the shoulders of these great open-source projects:
+
+- [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor): audio streams
+- [just_audio](https://pub.dev/packages/just_audio) and [audio_service](https://pub.dev/packages/audio_service): playback
+- [LRCLIB](https://lrclib.net): synced lyrics
+- [SponsorBlock](https://sponsor.ajay.app): skipping non-music segments
+- [drift](https://pub.dev/packages/drift): the local library database
+
+<details>
+<summary><b>🛠️ For developers</b></summary>
+
+<br/>
+
+Browse, search and account features go through a pure-Dart client for YouTube Music's internal InnerTube API (`lib/innertube/`). Audio streams are resolved on Android by NewPipeExtractor. Playback runs on `just_audio` behind `audio_service`, and the library lives in SQLite via `drift`.
+
+Architecture and design decisions are in [`docs/`](docs/README.md). Read [`AGENTS.md`](AGENTS.md) before contributing.
 
 ```
 lib/innertube/   InnerTube client, models, parsers
@@ -23,8 +130,6 @@ lib/features/    screens (home, explore, search, album, artist, playlist, librar
 lib/ui/          theme, router, shell, shared widgets
 test/innertube/  parser tests against recorded fixtures + live API smoke tests
 ```
-
-## Development
 
 ```bash
 flutter pub get
@@ -36,4 +141,18 @@ flutter run
 
 If YouTube changes break browsing, re-record fixtures and refresh the client version in `lib/innertube/clients.dart`. If playback breaks, bump the NewPipeExtractor version in `android/app/build.gradle.kts` first.
 
-This project uses YouTube's private API, which is against YouTube's Terms of Service. It is meant for personal use and distribution outside the Play Store.
+</details>
+
+---
+
+## ⚖️ Disclaimer
+
+1. YouPipe Music is an unofficial app. It is not affiliated with, endorsed by or connected to YouTube, Google LLC or any of their subsidiaries.
+2. All trademarks, and all music and content played in the app, belong to their respective owners.
+3. The app uses YouTube's private API, which is against YouTube's Terms of Service. It is meant for personal use and is distributed outside the Play Store.
+4. Use it at your own risk. The developer isn't responsible for any misuse or for issues arising from its use.
+
+<div align="center">
+<br/>
+<sub>Made with ♥ for music lovers</sub>
+</div>
