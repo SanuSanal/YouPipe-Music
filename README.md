@@ -15,6 +15,9 @@ A free, ad-free YouTube Music client for Android, with background playback, offl
 <a href="https://github.com/SanuSanal/YouPipe-Music/releases/latest">
   <img src="https://img.shields.io/badge/Get%20it%20on-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Get it on GitHub" height="48" />
 </a>
+<a href="https://sanusanal.github.io/YouPipe-Music/">
+  <img src="https://img.shields.io/badge/Visit-Website-FF0000?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Visit the website" height="48" />
+</a>
 
 </div>
 
