@@ -9,6 +9,10 @@ An ad-free YouTube Music client for Android, built with Flutter. The UI follows 
 - **Playback:** `just_audio` behind `audio_service`, which provides background playback, the notification and lockscreen controls.
 - **Library:** liked songs, history, saved items and your own playlists live in a local SQLite database (`drift`).
 
+## Docs
+
+Architecture and design decisions live in [`docs/`](docs/README.md). Agents (and humans) should read [`AGENTS.md`](AGENTS.md) first.
+
 ## Layout
 
 ```
