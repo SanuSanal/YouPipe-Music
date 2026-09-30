@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../data/error_log.dart';
 import 'dlna.dart';
 
 /// Casting to Chromecast (Google Cast SDK) and DLNA renderers such as smart TVs (docs/cast.md).
@@ -350,7 +351,7 @@ class CastController with WidgetsBindingObserver implements RemotePlayback {
     try {
       await run(active);
     } catch (e) {
-      debugPrint('YouPipe: cast $name failed: $e');
+      errorLog.add('cast', '$name failed: $e');
     }
   }
 }

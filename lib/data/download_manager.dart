@@ -4,12 +4,12 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../innertube/models.dart';
 import 'db/app_database.dart';
+import 'error_log.dart';
 import 'stream_resolver.dart';
 
 /// A download row joined with its song.
@@ -200,7 +200,7 @@ class DownloadManager {
       if (file != null && file.existsSync()) await file.delete();
       if (e is DioException && CancelToken.isCancel(e)) return;
       if (e is PlatformException && e.code == 'CANCELLED') return;
-      debugPrint('YouPipe: download of $id failed: $e');
+      errorLog.add('download', e, detail: id);
       await _update(id, const DownloadsCompanion(status: Value(DownloadStatus.failed)));
     } finally {
       _currentId = null;

@@ -26,7 +26,8 @@ flutter test --tags live --run-skipped   # hits the real InnerTube API (smoke te
 - **Use the Android SDK's adb** (`%LOCALAPPDATA%\Android\sdk\platform-tools\adb.exe`). The dev machine also has an older "Minimal ADB" on PATH, and mixing the two knocks the phone offline.
 - **Drive the UI** with `adb shell input tap/text/keyevent` and check with `adb exec-out screencap -p`. The phone is 1080×2400; the bottom nav sits at y≈2268 (Home x≈180, Explore x≈540, Library x≈900).
 - **Playback state:** `adb shell dumpsys media_session`. Look at `state=3` (playing), `position`, `buffered position` and `active item id`.
-- **App logs:** `adb logcat -s flutter:I`. The app's own messages start with `YouPipe:`.
+- **App logs:** `adb logcat -s flutter:I`. The app's own messages start with `YouPipe:`, and error log entries show as `YouPipe: [source] …`. On the phone itself, open the Error log page by tapping the version in Settings → About three times.
+- **Losing the network:** with the user's OK, `adb shell svc wifi disable` / `enable` while a song plays. Cut it early in a song, when the buffer is thin, to hit the recovery path, and always turn Wi-Fi back on.
 - **Stream and download URLs are bound to the phone's IP** (often IPv6), so they can't be replayed from the PC.
 - **Don't change system settings** (airplane mode etc.) on the user's phone. Check offline playback by confirming that the downloaded file exists and plays.
 

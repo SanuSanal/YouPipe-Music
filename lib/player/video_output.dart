@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
 
+import '../data/error_log.dart';
 import '../data/stream_resolver.dart';
 import 'cast.dart';
 
@@ -104,7 +105,7 @@ class VideoOutput implements RemotePlayback {
         debugPrint('YouPipe: video $id in HD, starting at ${hd.value.size.height.round()}p, up to ${stream.height}p');
         return hd;
       } catch (e) {
-        debugPrint('YouPipe: no HD video for $id, using 360p: $e');
+        errorLog.add('video', 'No HD, using 360p: $e', detail: id);
         unawaited(hd?.dispose());
         if (_key != key) return null;
       }

@@ -9,6 +9,7 @@ import '../../data/stream_resolver.dart';
 import '../../data/updater.dart';
 import '../../player/lock_screen.dart';
 import '../update/update_sheet.dart';
+import 'error_log_screen.dart';
 import '../../ui/widgets/thumbnail.dart';
 import '../../providers.dart';
 import '../../ui/theme/ytm_theme.dart';
@@ -195,15 +196,7 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
           const _Header('About'),
-          ListTile(
-            leading: const Icon(Icons.info_outline, color: YtmColors.textPrimary),
-            title: const Text('YouPipe Music'),
-            subtitle: Text(
-              'Version ${ref.watch(appInfoProvider).value?.versionName ?? '…'}\n'
-              'Ad-free YouTube Music client. Streams via NewPipeExtractor.',
-            ),
-            isThreeLine: true,
-          ),
+          const _VersionTile(),
           SwitchListTile(
             secondary: const Icon(Icons.update, color: YtmColors.textPrimary),
             title: const Text('Check for updates automatically'),
@@ -217,6 +210,43 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The About tile. Tapping it three times opens the hidden Error log page (docs/ui.md).
+class _VersionTile extends ConsumerStatefulWidget {
+  const _VersionTile();
+
+  @override
+  ConsumerState<_VersionTile> createState() => _VersionTileState();
+}
+
+class _VersionTileState extends ConsumerState<_VersionTile> {
+  final _taps = <DateTime>[];
+
+  void _onTap() {
+    final now = DateTime.now();
+    _taps
+      ..removeWhere((t) => now.difference(t) > const Duration(milliseconds: 1500))
+      ..add(now);
+    if (_taps.length < 3) return;
+    _taps.clear();
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ErrorLogScreen()));
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: _onTap,
+    child: ListTile(
+      leading: const Icon(Icons.info_outline, color: YtmColors.textPrimary),
+      title: const Text('YouPipe Music'),
+      subtitle: Text(
+        'Version ${ref.watch(appInfoProvider).value?.versionName ?? '…'}\n'
+        'Ad-free YouTube Music client. Streams via NewPipeExtractor.',
+      ),
+      isThreeLine: true,
+    ),
+  );
 }
 
 /// "Lock screen player" needs "Display over other apps", granted on a system page; the setting is
