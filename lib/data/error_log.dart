@@ -47,5 +47,55 @@ class ErrorLog {
   static String _trim(StackTrace stack) => stack.toString().split('\n').take(12).join('\n');
 }
 
+/// A GitHub "new issue" link prefilled with [entries] (newest first), the app version and device.
+/// The user reviews and submits it on GitHub. Entries that don't fit are left out, because GitHub
+/// rejects very long URLs; the body says how many and points to "Copy all".
+Uri githubIssueUrl({
+  required String repo,
+  required List<ErrorEntry> entries,
+  required String appVersion,
+  String? device,
+  int maxEncodedLength = 6000,
+}) {
+  final first = entries.isEmpty ? 'Error report' : entries.first.message.split('\n').first;
+  final title = entries.length == 1
+      ? 'Error: ${first.length > 80 ? '${first.substring(0, 80)}…' : first}'
+      : 'Error report (${entries.length} errors)';
+  String body(List<ErrorEntry> shown) {
+    final left = entries.length - shown.length;
+    return [
+      '**What happened**',
+      '<!-- What were you doing when this happened? -->',
+      '',
+      '**App:** $appVersion',
+      if (device != null) '**Device:** $device',
+      '',
+      '**Errors** (newest first, from the in-app Error log)',
+      '```',
+      ...shown.map((e) => e.toString()),
+      '```',
+      if (left > 0) '$left more not included here; use "Copy all" on the Error log page to add them.',
+    ].join('\n');
+  }
+
+  Uri build(List<ErrorEntry> shown) =>
+      Uri.https('github.com', '/$repo/issues/new', {'title': title, 'body': body(shown)});
+
+  // Add entries while the link stays short enough.
+  var shown = <ErrorEntry>[];
+  for (final e in entries) {
+    final next = [...shown, e];
+    if (build(next).toString().length > maxEncodedLength) break;
+    shown = next;
+  }
+  // The newest entry alone is too long (a big stack trace): send its message only.
+  if (shown.isEmpty && entries.isNotEmpty) {
+    final e = entries.first;
+    final message = e.message.length > 500 ? '${e.message.substring(0, 500)}…' : e.message;
+    shown = [ErrorEntry(time: e.time, source: e.source, message: message)];
+  }
+  return build(shown);
+}
+
 /// Shorthand for [ErrorLog.instance].
 final errorLog = ErrorLog.instance;
