@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/account.dart';
 import '../../data/stream_resolver.dart';
 import '../../data/updater.dart';
+import '../../player/lock_screen.dart';
 import '../update/update_sheet.dart';
 import '../../ui/widgets/thumbnail.dart';
 import '../../providers.dart';
@@ -128,6 +129,7 @@ class SettingsScreen extends ConsumerWidget {
             activeTrackColor: YtmColors.brandRed,
             onChanged: (v) => controller.update(s.copyWith(skipNonMusic: v)),
           ),
+          const _LockScreenTile(),
           const _Header('Content'),
           ListTile(
             leading: const Icon(Icons.public, color: YtmColors.textPrimary),
@@ -195,6 +197,74 @@ class SettingsScreen extends ConsumerWidget {
           const _CheckForUpdatesTile(),
         ],
       ),
+    );
+  }
+}
+
+/// "Lock screen player" needs "Display over other apps", granted on a system page; the setting is
+/// only saved once the user comes back with it granted.
+class _LockScreenTile extends ConsumerStatefulWidget {
+  const _LockScreenTile();
+
+  @override
+  ConsumerState<_LockScreenTile> createState() => _LockScreenTileState();
+}
+
+class _LockScreenTileState extends ConsumerState<_LockScreenTile> with WidgetsBindingObserver {
+  bool _granted = true;
+  bool _awaitingPermission = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _check();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _check();
+  }
+
+  Future<void> _check() async {
+    final granted = await LockScreenPlayer.canShow();
+    if (!mounted) return;
+    setState(() => _granted = granted);
+    if (_awaitingPermission && granted) {
+      final controller = ref.read(settingsProvider.notifier);
+      await controller.update(ref.read(settingsProvider).copyWith(lockScreenPlayer: true));
+    }
+    _awaitingPermission = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(settingsProvider);
+    final controller = ref.read(settingsProvider.notifier);
+    return SwitchListTile(
+      secondary: const Icon(Icons.screen_lock_portrait_outlined, color: YtmColors.textPrimary),
+      title: const Text('Lock screen player'),
+      subtitle: Text(
+        s.lockScreenPlayer && !_granted
+            ? 'Needs "Display over other apps" to show'
+            : 'Full-screen artwork and controls on the lock screen',
+      ),
+      value: s.lockScreenPlayer,
+      activeTrackColor: YtmColors.brandRed,
+      onChanged: (v) {
+        if (!v || _granted) {
+          controller.update(s.copyWith(lockScreenPlayer: v));
+        } else {
+          _awaitingPermission = true;
+          LockScreenPlayer.requestPermission();
+        }
+      },
     );
   }
 }

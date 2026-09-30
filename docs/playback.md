@@ -43,6 +43,8 @@
   - It falls back to YouTube Music's plain lyrics.
   - LRC is parsed by `lrc.dart`; the active line is found with a binary search (`activeLineIndex`) plus a 250 ms lead.
 
+- **Lock screen player:** an opt-in activity over the keyguard, driven by the media session. Its Like and Repeat buttons are the custom actions `toggleLike`/`cycleRepeat` (`customAction`). See [lockscreen.md](lockscreen.md).
+
 ## Android Auto (`auto_browser.dart`)
 
 - The handler's `getChildren`, `playFromMediaId`, `search` and `playFromSearch` delegate to `AutoBrowser`, which `autoBrowserProvider` sets up.

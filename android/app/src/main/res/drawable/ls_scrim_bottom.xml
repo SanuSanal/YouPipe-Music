@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark base under the title and controls. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:centerColor="#D9000000"
+        android:centerY="0.35"
+        android:endColor="#FA000000"
+        android:startColor="#00000000" />
+</shape>

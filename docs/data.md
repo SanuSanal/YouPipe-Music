@@ -24,6 +24,6 @@
 
 ## Preferences and secrets
 
-- **SharedPreferences keys:** `visitorData`, `quality`, `hl`, `gl`, `saveHistory`, `skipNonMusic`, `eqEnabled`, `eqGains`, `loudnessDb`, `eqPreset`, `autoUpdateCheck`, `skippedUpdateVersion` (see updates.md).
+- **SharedPreferences keys:** `visitorData`, `quality`, `hl`, `gl`, `saveHistory`, `skipNonMusic`, `eqEnabled`, `eqGains`, `loudnessDb`, `eqPreset`, `autoUpdateCheck`, `skippedUpdateVersion` (see updates.md), `lockScreenPlayer` (also read natively as `flutter.lockScreenPlayer`, see lockscreen.md).
 - **Session cookie:** `flutter_secure_storage`, key `ytm_cookie`. Never log it or write it anywhere else.
 - **Downloads** live under `<applicationSupportDirectory>/downloads/`. To inspect them on a debug build: `adb shell run-as com.youpipe.music ls files/downloads`.

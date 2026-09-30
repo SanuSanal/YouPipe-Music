@@ -28,7 +28,7 @@ Local data: drift SQLite (lib/data/db), SharedPreferences (settings), flutter_se
 | `lib/player/` | `audio_handler.dart` (queue, playback, effects, timers); `auto_browser.dart` (Android Auto tree) |
 | `lib/ui/` | Theme tokens, router, app shell (bottom nav + player panel), shared widgets, navigation helpers |
 | `lib/features/<screen>/` | One folder per screen |
-| `android/app/src/main/kotlin/com/youpipe/music/` | Native channels: stream extraction, downloader, cookies, updater |
+| `android/app/src/main/kotlin/com/youpipe/music/` | Native channels: stream extraction, downloader, cookies, updater; the lock screen player activity |
 | `tool/` | Fixture recording and renderer-tree inspection scripts (Python) |
 
 ## Wiring and startup
