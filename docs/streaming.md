@@ -28,6 +28,8 @@
   - The file is fetched in **1 MB `Range` chunks**.
   - Progress is reported on the `youpipe/downloader/progress` EventChannel; `cancel({id})` stops a download.
   - The earlier Dart/dio implementation got 403s intermittently, so don't move downloads back to Dart.
+- `Googlevideo.kt` holds the User-Agent choice and the 1 MB range request, shared by the downloader and the cast proxy.
+- **Cast devices** (Chromecast, DLNA TVs) can't fetch these URLs either, so the phone relays the audio over the LAN (`CastProxy.kt`, see [cast.md](cast.md)).
 - Cover art (googleusercontent / i.ytimg) is not IP-bound, and is downloaded with dio.
 
 ## Download manager (`lib/data/download_manager.dart`)

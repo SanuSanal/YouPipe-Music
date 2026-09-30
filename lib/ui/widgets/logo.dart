@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../data/account.dart';
 import '../navigation.dart';
+import 'cast_button.dart';
 import 'thumbnail.dart';
 import '../theme/ytm_theme.dart';
 
@@ -34,7 +35,7 @@ class YouPipeWordmark extends StatelessWidget {
   }
 }
 
-/// Search + settings buttons shown on the top bar of every tab.
+/// Cast, search and settings buttons shown on the top bar of every tab.
 class TopBarActions extends ConsumerWidget {
   const TopBarActions({super.key});
 
@@ -44,6 +45,7 @@ class TopBarActions extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        const CastButton(),
         IconButton(icon: const Icon(Icons.search), tooltip: 'Search', onPressed: () => openSearch(context, ref)),
         IconButton(
           tooltip: 'Settings',

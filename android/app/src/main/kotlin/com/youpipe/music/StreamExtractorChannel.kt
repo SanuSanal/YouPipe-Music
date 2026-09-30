@@ -72,7 +72,7 @@ object StreamExtractorChannel {
         }
     }
 
-    private fun ensureInit(
+    fun ensureInit(
         hl: String,
         gl: String,
     ) {
@@ -86,7 +86,8 @@ object StreamExtractorChannel {
         }
     }
 
-    private fun getAudioStreams(
+    /** Also used by [CastProxy], which picks its own format. */
+    fun getAudioStreams(
         videoId: String,
         hl: String,
         gl: String,

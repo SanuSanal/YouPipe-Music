@@ -27,14 +27,15 @@ A free, ad-free YouTube Music client for Android, with background playback, offl
 
 <table align="center">
   <tr>
-    <td align="center"><img src="assets/screenshots/home.webp" width="240" alt="Home: Quick picks and moods" /><br/><sub><b>Home</b></sub></td>
-    <td align="center"><img src="assets/screenshots/player.webp" width="240" alt="Now playing, tinted from the artwork" /><br/><sub><b>Now playing</b></sub></td>
-    <td align="center"><img src="assets/screenshots/lockscreen.webp" width="240" alt="Full-screen lock screen player" /><br/><sub><b>Lock screen player</b></sub></td>
+    <td align="center"><img src="assets/screenshots/home.webp" width="200" alt="Home: Quick picks and moods" /><br/><sub><b>Home</b></sub></td>
+    <td align="center"><img src="assets/screenshots/player.webp" width="200" alt="Now playing, tinted from the artwork" /><br/><sub><b>Now playing</b></sub></td>
+    <td align="center"><img src="assets/screenshots/lockscreen.webp" width="200" alt="Full-screen lock screen player" /><br/><sub><b>Lock screen player</b></sub></td>
+    <td align="center"><img src="assets/screenshots/cast.webp" width="200" alt="Cast to a smart TV or Chromecast" /><br/><sub><b>Cast to your TV</b></sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/explore.webp" width="240" alt="Explore: new releases, charts, moods" /><br/><sub><b>Explore</b></sub></td>
-    <td align="center"><img src="assets/screenshots/album.webp" width="240" alt="Album page" /><br/><sub><b>Albums</b></sub></td>
-    <td align="center"><img src="assets/screenshots/upnext.webp" width="240" alt="Up next queue with endless radio" /><br/><sub><b>Up next</b></sub></td>
+    <td align="center"><img src="assets/screenshots/explore.webp" width="200" alt="Explore: new releases, charts, moods" /><br/><sub><b>Explore</b></sub></td>
+    <td align="center"><img src="assets/screenshots/album.webp" width="200" alt="Album page" /><br/><sub><b>Albums</b></sub></td>
+    <td align="center"><img src="assets/screenshots/upnext.webp" width="200" alt="Up next queue with endless radio" /><br/><sub><b>Up next</b></sub></td>
   </tr>
 </table>
 
@@ -69,7 +70,8 @@ A free, ad-free YouTube Music client for Android, with background playback, offl
 - Your own library on the device: liked songs, playlists, saved albums and listening history
 - **Optional** sign-in to YouTube Music to bring in your account's library, likes and personal recommendations. Everything works without an account too
 
-**In the car**
+**Cast & car**
+- Cast to smart TVs and speakers (DLNA) or a Chromecast / Google TV
 - Android Auto support
 
 ---

@@ -45,6 +45,8 @@
 
 - **Lock screen player:** an opt-in activity over the keyguard, driven by the media session. Its Like and Repeat buttons are the custom actions `toggleLike`/`cycleRepeat` (`customAction`). See [lockscreen.md](lockscreen.md).
 
+- **Casting (Chromecast, DLNA):** while a device is connected, `_loadIndex` loads songs on it and the transport follows it (`handler.cast`). See [cast.md](cast.md).
+
 ## Android Auto (`auto_browser.dart`)
 
 - The handler's `getChildren`, `playFromMediaId`, `search` and `playFromSearch` delegate to `AutoBrowser`, which `autoBrowserProvider` sets up.
