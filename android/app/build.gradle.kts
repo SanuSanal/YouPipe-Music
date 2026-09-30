@@ -80,5 +80,7 @@ dependencies {
     // Browse/search/next use our own Dart InnerTube client.
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Lock screen player: talks to audio_service's media session (audio_service keeps this internal).
+    implementation("androidx.media:media:1.7.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }

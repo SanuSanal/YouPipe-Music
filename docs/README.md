@@ -15,6 +15,7 @@ These docs record the architecture and the decisions a new session needs in orde
 | [account.md](account.md) | Google sign-in, authenticated requests, account sync |
 | [testing.md](testing.md) | tests, fixtures, running on a device |
 | [release.md](release.md) | the release workflow, signing, R8 keep rules, `android/app/build.gradle.kts` |
+| [lockscreen.md](lockscreen.md) | the opt-in lock screen player: `LockScreenActivity.kt`, `LockScreenLauncher.kt` |
 | [updates.md](updates.md) | the in-app updater: GitHub check, download, install, `UpdateChannel.kt` |
 | [site.md](site.md) | the website in `site/` and its GitHub Pages workflow |
 | [roadmap.md](roadmap.md) | what's done, what's next, known issues |

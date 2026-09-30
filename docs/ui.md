@@ -10,6 +10,7 @@
   - `logo_monochrome.svg`: the Android 13 themed icon (bore cut out).
   - The notification icon is `res/drawable/ic_stat_youpipe.xml`.
 - **Regenerating icons:** render the PNGs with ImageMagick (`magick -background none -density 384 x.svg -resize 1024x1024 x_1024.png`), then run `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`. Both are configured in `pubspec.yaml`.
+- **One exception:** the opt-in lock screen player ([lockscreen.md](lockscreen.md)). YTM has no custom lock screen.
 - **Never ship** YouTube's logos, the play-triangle mark or the YouTube Sans font. Use Roboto and Material icons.
 
 ## Theme (`lib/ui/theme/ytm_theme.dart`)

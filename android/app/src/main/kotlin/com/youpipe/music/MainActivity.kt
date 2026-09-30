@@ -10,5 +10,6 @@ class MainActivity : AudioServiceActivity() {
         DownloadChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         CookieChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         UpdateChannel(this).register(flutterEngine.dartExecutor.binaryMessenger)
+        LockScreenLauncher.register(this, flutterEngine.dartExecutor.binaryMessenger)
     }
 }

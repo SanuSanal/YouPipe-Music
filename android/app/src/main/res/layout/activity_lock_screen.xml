@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lock screen player (LockScreenActivity): full-bleed artwork, clock on top, controls below. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF030303">
+
+    <FrameLayout
+        android:id="@+id/page"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/art"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop" />
+
+        <!-- A light overall dim, so white text holds up on bright artwork. -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#26000000" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="380dp"
+            android:layout_gravity="top"
+            android:background="@drawable/ls_scrim_top" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="560dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/ls_scrim_bottom" />
+
+        <LinearLayout
+            android:id="@+id/content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <TextClock
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:fontFamily="sans-serif-light"
+                android:format12Hour="h:mm"
+                android:format24Hour="HH:mm"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:shadowColor="#99000000"
+                android:shadowRadius="16"
+                android:textColor="#FFFFFFFF"
+                android:textSize="84sp" />
+
+            <TextClock
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:format12Hour="EEEE, d MMMM"
+                android:format24Hour="EEEE, d MMMM"
+                android:gravity="center"
+                android:shadowColor="#99000000"
+                android:shadowRadius="12"
+                android:textColor="#E6FFFFFF"
+                android:textSize="18sp" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:shadowColor="#99000000"
+                android:shadowRadius="12"
+                android:textColor="#FFFFFFFF"
+                android:textSize="26sp" />
+
+            <TextView
+                android:id="@+id/artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#FFAAAAAA"
+                android:textSize="17sp" />
+
+            <SeekBar
+                android:id="@+id/seek"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="-16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginEnd="-16dp"
+                android:maxHeight="16dp"
+                android:minHeight="16dp"
+                android:splitTrack="false"
+                android:thumbTint="#FFFFFFFF" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/elapsed"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#FFAAAAAA"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/duration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#FFAAAAAA"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/like"
+                    style="@style/LockScreenButton"
+                    android:contentDescription="Like"
+                    android:src="@drawable/ic_ls_like" />
+
+                <ImageButton
+                    android:id="@+id/previous"
+                    style="@style/LockScreenButton"
+                    android:contentDescription="Previous"
+                    android:scaleX="1.4"
+                    android:scaleY="1.4"
+                    android:src="@drawable/ic_ls_previous" />
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1">
+
+                    <ImageButton
+                        android:id="@+id/play"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/ls_play_button"
+                        android:contentDescription="Play"
+                        android:scaleType="center"
+                        android:src="@drawable/ic_ls_play"
+                        android:tint="#FF000000" />
+                </FrameLayout>
+
+                <ImageButton
+                    android:id="@+id/next"
+                    style="@style/LockScreenButton"
+                    android:contentDescription="Next"
+                    android:scaleX="1.4"
+                    android:scaleY="1.4"
+                    android:src="@drawable/ic_ls_next" />
+
+                <ImageButton
+                    android:id="@+id/repeat"
+                    style="@style/LockScreenButton"
+                    android:contentDescription="Repeat"
+                    android:src="@drawable/ic_ls_repeat" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/unlock_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="16dp"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:alpha="0.8"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_ls_unlock" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Swipe up to unlock"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

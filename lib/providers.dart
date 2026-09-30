@@ -64,6 +64,21 @@ final autoBrowserProvider = Provider<AutoBrowser>((ref) {
   return browser;
 });
 
+/// Wires the lock screen player's Like button to the library and keeps its liked state current
+/// (watched from the app root).
+final lockScreenLikeProvider = Provider<void>((ref) {
+  final handler = ref.read(audioHandlerProvider);
+  final song = ref.watch(currentSongProvider);
+  if (song == null) {
+    handler.onToggleLike = null;
+    return;
+  }
+  final liked = ref.watch(isLikedProvider(song.videoId)).value ?? false;
+  handler.setLiked(song.videoId, liked);
+  final account = ref.read(accountActionsProvider);
+  handler.onToggleLike = () => account.setLiked(song, !liked);
+});
+
 final sponsorBlockProvider = Provider<SponsorBlockService>((ref) => SponsorBlockService());
 
 final libraryProvider = Provider<LibraryRepository>((ref) => LibraryRepository(ref.watch(databaseProvider)));
@@ -81,6 +96,7 @@ class AppSettings {
     this.saveHistory = true,
     this.skipNonMusic = true,
     this.autoUpdateCheck = true,
+    this.lockScreenPlayer = false,
   });
 
   final AudioQuality quality;
@@ -94,6 +110,9 @@ class AppSettings {
   /// Look for a new GitHub release when the app opens.
   final bool autoUpdateCheck;
 
+  /// Show the full-screen lock screen player while music plays (read natively by LockScreenLauncher.kt).
+  final bool lockScreenPlayer;
+
   AppSettings copyWith({
     AudioQuality? quality,
     String? hl,
@@ -101,6 +120,7 @@ class AppSettings {
     bool? saveHistory,
     bool? skipNonMusic,
     bool? autoUpdateCheck,
+    bool? lockScreenPlayer,
   }) => AppSettings(
     quality: quality ?? this.quality,
     hl: hl ?? this.hl,
@@ -108,6 +128,7 @@ class AppSettings {
     saveHistory: saveHistory ?? this.saveHistory,
     skipNonMusic: skipNonMusic ?? this.skipNonMusic,
     autoUpdateCheck: autoUpdateCheck ?? this.autoUpdateCheck,
+    lockScreenPlayer: lockScreenPlayer ?? this.lockScreenPlayer,
   );
 }
 
@@ -126,6 +147,7 @@ class SettingsController extends Notifier<AppSettings> {
       saveHistory: p.getBool('saveHistory') ?? true,
       skipNonMusic: p.getBool('skipNonMusic') ?? true,
       autoUpdateCheck: p.getBool('autoUpdateCheck') ?? true,
+      lockScreenPlayer: p.getBool('lockScreenPlayer') ?? false,
     );
     _apply(s);
     return s;
@@ -152,6 +174,7 @@ class SettingsController extends Notifier<AppSettings> {
     await _prefs.setBool('saveHistory', s.saveHistory);
     await _prefs.setBool('skipNonMusic', s.skipNonMusic);
     await _prefs.setBool('autoUpdateCheck', s.autoUpdateCheck);
+    await _prefs.setBool('lockScreenPlayer', s.lockScreenPlayer);
   }
 }
 

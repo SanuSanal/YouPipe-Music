@@ -93,6 +93,11 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Emits when a non-music section was skipped (for a toast).
   final skippedSegments = StreamController<SkipSegment>.broadcast();
 
+  /// The lock screen player's Like button (`customAction('toggleLike')`); set by the app.
+  Future<void> Function()? onToggleLike;
+  String? _likedId;
+  bool _liked = false;
+
   /// When playback will stop, if a sleep timer is set.
   final sleepTimer = ValueNotifier<SleepTimer?>(null);
   Timer? _sleepTimer;
@@ -130,6 +135,17 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       null => null,
     },
   );
+
+  /// The current song's media item, with the liked flag the lock screen player reads.
+  MediaItem _nowPlaying(SongItem s) => toMediaItem(s).copyWith(extras: {'liked': _likedId == s.videoId && _liked});
+
+  /// Publishes whether [videoId] is liked, for the lock screen player.
+  void setLiked(String videoId, bool liked) {
+    _likedId = videoId;
+    _liked = liked;
+    final item = mediaItem.value;
+    if (item?.id == videoId) mediaItem.add(item!.copyWith(extras: {...?item.extras, 'liked': liked}));
+  }
 
   void _publish(QueueState state) {
     queueState.value = state;
@@ -233,7 +249,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     if (!forceRefresh) _retriedCurrent = false;
     final song = s.songs[index];
     _publish(s.copyWith(index: index));
-    mediaItem.add(toMediaItem(song));
+    mediaItem.add(_nowPlaying(song));
     playbackState.add(
       playbackState.value.copyWith(
         queueIndex: index,
@@ -256,7 +272,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       }
       final duration = await _player.setAudioSource(source, initialPosition: position);
       if (gen != _loadGeneration) return;
-      if (duration != null) mediaItem.add(toMediaItem(song).copyWith(duration: duration));
+      if (duration != null) mediaItem.add(_nowPlaying(song).copyWith(duration: duration));
       _segments = const [];
       final loader = segmentLoader;
       if (loader != null) {
@@ -391,6 +407,17 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         },
       ),
     );
+  }
+
+  /// Buttons of the lock screen player (LockScreenActivity.kt) that have no standard session action.
+  @override
+  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+    switch (name) {
+      case 'toggleLike':
+        await onToggleLike?.call();
+      case 'cycleRepeat':
+        cycleRepeat();
+    }
   }
 
   // Android Auto / media browser ------------------------------------------------------------
