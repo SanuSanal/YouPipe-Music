@@ -20,6 +20,7 @@
   - Text white and `#AAAAAA`; brand red `#FF0000`.
   - Chips are 10% white, or white with black text when selected.
 - `YtmSizes`: page padding 16, carousel card 160, list thumbnail 48, mini player 64, nav bar 64.
+- **Toasts** are dark floating cards: `elevated` background, white text, 8dp radius (`snackBarTheme`).
 - **Use the tokens.** Don't hard-code new colours.
 
 ## Navigation (`lib/ui/router.dart`, `lib/ui/navigation.dart`)
@@ -41,7 +42,7 @@
   2. The expanded player collapses (`BackButtonListener`).
   3. Pages pop.
   4. Leaving a non-Home tab goes to Home, then the app exits.
-- **Toasts:** the shell also shows SponsorBlock skip toasts.
+- **Toasts:** always use `showSnack` (`item_menu.dart`). Inside the shell it sets the toast's bottom margin so it floats above the mini player and nav bar (only above the system bar when the player is expanded). The shell also shows SponsorBlock skip toasts.
 
 ## Shared widgets (`lib/ui/widgets/`)
 

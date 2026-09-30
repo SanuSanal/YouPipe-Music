@@ -9,6 +9,7 @@ import '../../data/db/app_database.dart' show DownloadStatus;
 import '../../innertube/models.dart';
 import '../../providers.dart';
 import '../navigation.dart';
+import '../shell/app_shell.dart' show AppShell;
 import '../theme/ytm_theme.dart';
 import 'states.dart';
 import 'thumbnail.dart';
@@ -22,10 +23,19 @@ String shareUrl(YTItem item) => switch (item) {
   PlaylistItem() => 'https://music.youtube.com/playlist?list=${item.id}',
 };
 
+/// Shows a toast. Inside the app shell it floats above the mini player and nav bar, as in YTM.
 void showSnack(BuildContext context, String message) {
+  EdgeInsets? margin;
+  if (context.widget is AppShell || context.findAncestorWidgetOfExactType<AppShell>() != null) {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final covered = container.read(playerPanelProvider)
+        ? 0.0
+        : YtmSizes.navBarHeight + (container.read(currentSongProvider) != null ? YtmSizes.miniPlayerHeight : 0);
+    margin = EdgeInsets.fromLTRB(8, 0, 8, covered + 8);
+  }
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
+    ..showSnackBar(SnackBar(content: Text(message), margin: margin, duration: const Duration(seconds: 2)));
 }
 
 /// Songs behind an album/playlist item, for "Play next" / "Add to queue".
