@@ -16,7 +16,8 @@
   - Android Auto browsing.
   - Google sign-in with account library and like/save/subscribe sync, plus "Save to library".
 - **Lock screen player** (opt-in, Resso-style; see [lockscreen.md](lockscreen.md)).
-- **Video mode (360p):** the Song/Video toggle plays the song's music video (see [playback.md](playback.md)).
+- **Video mode:** the Song/Video toggle plays the song's music video, in HD up to 1080p through a local DASH manifest, with a Video quality setting and a 360p fallback (see [playback.md](playback.md)).
+- **Audio quality:** Low/Normal/High, DRC ("stable volume") copies skipped; the next song is preloaded for gapless playback.
 - **Casting** to DLNA TVs/speakers and Chromecast, with the phone relaying the audio (see [cast.md](cast.md)). DLNA is tested on a Samsung TV; Chromecast isn't tested on a real device yet.
 - **Releases:** signed APKs are published to GitHub Releases by a tag-triggered workflow (see [release.md](release.md)), and the app updates itself from them (see [updates.md](updates.md)).
 
@@ -24,7 +25,7 @@
 
 - **Return YouTube Dislike** (dislike counts).
 - **Remote client config** (JSON hosted on GitHub) so client version or player fixes can ship without an app release.
-- **Video mode in HD:** v1 plays the muxed 360p stream; next are video-only DASH streams merged with the audio stream (native ExoPlayer), a quality setting, and song↔video position alignment.
+- **Video mode:** song↔video position alignment.
 - **Discord status, home-screen widget, backup import/export, localisation, tablet layout.**
 - **Lyrics translation.**
 

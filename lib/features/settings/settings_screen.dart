@@ -103,6 +103,17 @@ class SettingsScreen extends ConsumerWidget {
       if (value != null) onPick(value);
     }
 
+    const audioQualities = {
+      AudioQuality.high: 'High',
+      AudioQuality.normal: 'Normal',
+      AudioQuality.low: 'Low (saves data)',
+    };
+    const videoQualities = {
+      VideoQuality.auto: 'Auto (recommended)',
+      VideoQuality.high: 'Higher picture quality',
+      VideoQuality.dataSaver: 'Data saver',
+    };
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -113,12 +124,19 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.high_quality_outlined, color: YtmColors.textPrimary),
             title: const Text('Audio quality'),
-            subtitle: Text(s.quality == AudioQuality.high ? 'High' : 'Low (saves data)'),
+            subtitle: Text(audioQualities[s.quality]!),
+            onTap: () =>
+                pick('Audio quality', audioQualities, s.quality, (v) => controller.update(s.copyWith(quality: v))),
+          ),
+          ListTile(
+            leading: const Icon(Icons.hd_outlined, color: YtmColors.textPrimary),
+            title: const Text('Video quality'),
+            subtitle: Text(videoQualities[s.videoQuality]!),
             onTap: () => pick(
-              'Audio quality',
-              {AudioQuality.high: 'High', AudioQuality.low: 'Low (saves data)'},
-              s.quality,
-              (v) => controller.update(s.copyWith(quality: v)),
+              'Video quality',
+              videoQualities,
+              s.videoQuality,
+              (v) => controller.update(s.copyWith(videoQuality: v)),
             ),
           ),
           SwitchListTile(

@@ -60,5 +60,6 @@
 | `LoadingView`, `ErrorView`, `EmptyView`, `songCount()` | Standard states and pluralisation |
 
 - **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video plays the music video in place of the artwork; it's dimmed when the song has no video or while casting; see playback.md), left-aligned Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
+- **Full-screen video** (`video_fullscreen.dart`, `openVideoFullscreen`): tapping the video in video mode shows a full-screen button for 3 s (it also shows when a video starts). Full screen is a route on the root navigator, forced to landscape with immersive system UI. Tapping shows the title, previous/play/next, the shared `SeekBar` and an exit button; they fade after 3 s while playing. Back, the collapse arrow or the exit button leave it (orientation goes back to the system default, UI mode to edge-to-edge). It closes itself when video mode ends (casting, no video).
 - **Artist page:** `SliverAppBar` with `FlexibleSpaceBar`, where the full-bleed image collapses into a solid bar with the name.
 - **Search:** suggestions highlight the part you haven't typed yet; search history is shown when the field is empty; filter chips use the `SearchFilter` params.

@@ -71,6 +71,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     _player.processingStateStream.listen((s) {
       if (s == ProcessingState.completed) _onCompleted();
     });
+    _player.currentIndexStream.listen(_onPlayerIndex);
     _player.positionStream.listen((p) {
       if (_output == null) _skipSegments(p);
     });
@@ -166,6 +167,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   int _loadGeneration = 0;
   bool _retriedCurrent = false;
 
+  /// Serializes changes to the preloaded next song (see [_syncPreloaded]).
+  Future<void> _preloadOp = Future.value();
+
   /// Follows the active output; `positionProvider` re-subscribes when that changes.
   Stream<Duration> get positionStream => _remoteActive ? _remotePositions.stream : _player.positionStream;
   Stream<Duration> get bufferedPositionStream => _player.bufferedPositionStream;
@@ -242,6 +246,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     }
     final list = List.of(s.songs)..insertAll(s.index + 1, songs);
     _publish(s.copyWith(songs: list));
+    _syncPreloaded();
   }
 
   void addToQueue(List<SongItem> songs) {
@@ -251,6 +256,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       return;
     }
     _publish(s.copyWith(songs: [...s.songs, ...songs]));
+    _syncPreloaded();
   }
 
   void removeFromQueue(int i) {
@@ -258,6 +264,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     if (i == s.index || i < 0 || i >= s.songs.length) return;
     final list = List.of(s.songs)..removeAt(i);
     _publish(s.copyWith(songs: list, index: i < s.index ? s.index - 1 : s.index));
+    _syncPreloaded();
   }
 
   void moveInQueue(int from, int to) {
@@ -275,6 +282,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       index++;
     }
     _publish(s.copyWith(songs: list, index: index));
+    _syncPreloaded();
   }
 
   /// Like YouTube Music: shuffling reorders the upcoming songs in the visible queue.
@@ -287,6 +295,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       _publish(s.copyWith(shuffle: !s.shuffle));
     }
     _broadcastState(null);
+    _syncPreloaded();
   }
 
   void cycleRepeat() {
@@ -294,6 +303,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     final next = QueueRepeatMode.values[(s.repeat.index + 1) % QueueRepeatMode.values.length];
     _publish(s.copyWith(repeat: next));
     _broadcastState(null);
+    _syncPreloaded();
   }
 
   // Playback ---------------------------------------------------------------------------------
@@ -318,15 +328,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     try {
       final local = await localFile?.call(song.videoId);
       if (gen != _loadGeneration) return;
-      _segments = const [];
+      _loadSegments(song.videoId, gen);
       final loader = segmentLoader;
-      if (loader != null) {
-        unawaited(
-          loader(song.videoId).then((segs) {
-            if (gen == _loadGeneration) _segments = segs;
-          }, onError: (_) {}),
-        );
-      }
       if (_remoteActive) {
         _remoteUrl = null;
         _remote = null;
@@ -362,6 +365,17 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         }
         return;
       }
+      // The song is already preloaded behind the current one: move on to it without reloading.
+      final seq = _player.sequence;
+      if (position == null &&
+          !forceRefresh &&
+          (_player.currentIndex ?? 0) == 0 &&
+          seq.length > 1 &&
+          seq[1].tag == song.videoId) {
+        await _player.seekToNext();
+        if (autoplay) unawaited(_player.play());
+        return;
+      }
       final AudioSource source;
       if (local != null) {
         source = AudioSource.file(local, tag: song.videoId);
@@ -373,7 +387,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       final duration = await _player.setAudioSource(source, initialPosition: position);
       if (gen != _loadGeneration) return;
       if (duration != null) mediaItem.add(_nowPlaying(song).copyWith(duration: duration));
-      _prefetchNext();
+      _syncPreloaded();
       if (autoplay) await _player.play();
     } catch (e) {
       if (gen != _loadGeneration) return;
@@ -403,11 +417,94 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
-  void _prefetchNext() {
+  void _loadSegments(String videoId, int gen) {
+    _segments = const [];
+    final loader = segmentLoader;
+    if (loader == null) return;
+    unawaited(
+      loader(videoId).then((segs) {
+        if (gen == _loadGeneration) _segments = segs;
+      }, onError: (_) {}),
+    );
+  }
+
+  // Preloading the next song ------------------------------------------------------------------
+  //
+  // On the phone's own player the next song sits behind the current one in just_audio's playlist, so
+  // ExoPlayer buffers it before the current song ends and moves on without a gap (docs/playback.md).
+
+  /// The queue index that plays after the current song; null when playback stops or repeats there.
+  int? _upcomingIndex() {
     final s = queueState.value;
-    if (s.index + 1 < s.songs.length) {
-      unawaited(_resolver.resolve(s.songs[s.index + 1].videoId).then((_) {}, onError: (_) {}));
+    if (s.current == null || s.repeat == QueueRepeatMode.one || sleepTimer.value?.endOfSong == true) return null;
+    if (s.index + 1 < s.songs.length) return s.index + 1;
+    if (s.repeat == QueueRepeatMode.all && s.songs.length > 1) return 0;
+    return null;
+  }
+
+  /// Makes the player's playlist [current song, upcoming song]. Call it after anything that changes
+  /// which song comes next.
+  void _syncPreloaded() {
+    _preloadOp = _preloadOp.then((_) => _doSyncPreloaded()).catchError((Object e) {
+      debugPrint('YouPipe: preloading the next song failed: $e');
+    });
+  }
+
+  Future<void> _doSyncPreloaded() async {
+    if (_remoteActive) return;
+    final gen = _loadGeneration;
+    final current = queueState.value.current;
+    final at = _player.currentIndex ?? 0;
+    if (current == null || at >= _player.sequence.length || _player.sequence[at].tag != current.videoId) return;
+    // Drop the song the player already moved on from.
+    if (at > 0) await _player.removeAudioSourceRange(0, at);
+    final upcoming = _upcomingIndex();
+    final want = upcoming == null ? null : queueState.value.songs[upcoming].videoId;
+    final length = _player.sequence.length;
+    if (length == 2 && _player.sequence[1].tag == want) return;
+    if (gen != _loadGeneration) return;
+    if (length > 1) await _player.removeAudioSourceRange(1, length);
+    if (want == null) return;
+    final local = await localFile?.call(want);
+    final AudioSource source;
+    if (local != null) {
+      source = AudioSource.file(local, tag: want);
+    } else {
+      source = AudioSource.uri(Uri.parse((await _resolver.resolve(want)).url), tag: want);
     }
+    final upcomingNow = _upcomingIndex();
+    if (gen != _loadGeneration ||
+        _remoteActive ||
+        _player.sequence.length != 1 ||
+        upcomingNow == null ||
+        queueState.value.songs[upcomingNow].videoId != want) {
+      return;
+    }
+    await _player.addAudioSource(source);
+  }
+
+  /// The player moved on to the preloaded song, by itself or through [_loadIndex]'s shortcut.
+  void _onPlayerIndex(int? i) {
+    if (i == null || i == 0 || _remoteActive) return;
+    final seq = _player.sequence;
+    if (i >= seq.length) return;
+    final id = seq[i].tag as String?;
+    final s = queueState.value;
+    final upcoming = _upcomingIndex();
+    final index = s.current?.videoId == id
+        ? s.index
+        : upcoming != null && s.songs[upcoming].videoId == id
+        ? upcoming
+        : s.songs.indexWhere((song) => song.videoId == id);
+    if (index < 0) return;
+    final gen = ++_loadGeneration;
+    _retriedCurrent = false;
+    final song = s.songs[index];
+    _publish(s.copyWith(index: index));
+    mediaItem.add(_nowPlaying(song).copyWith(duration: _player.duration ?? song.duration));
+    _loadSegments(song.videoId, gen);
+    unawaited(_maybeExtend());
+    _syncPreloaded();
   }
 
   /// Keeps radio queues topped up: fetch more when fewer than 5 songs remain.
@@ -667,12 +764,15 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   void sleepAtEndOfSong() {
     _sleepTimer?.cancel();
     sleepTimer.value = const SleepTimer(endOfSong: true);
+    _syncPreloaded();
   }
 
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
     _sleepTimer = null;
+    final endOfSong = sleepTimer.value?.endOfSong ?? false;
     sleepTimer.value = null;
+    if (endOfSong) _syncPreloaded();
   }
 
   Future<void> _fadeOutAndPause() async {

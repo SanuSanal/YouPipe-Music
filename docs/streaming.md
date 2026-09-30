@@ -10,16 +10,20 @@
 
 ## Stream resolution
 
-- Kotlin `StreamExtractorChannel.kt`, method `youpipe/stream_extractor.getAudioStreams({videoId, hl, gl})`, returns `{videoId, durationSeconds, streams: [{url, itag, mimeType, codec, bitrate, contentLength}]}`. It keeps only progressive-HTTP streams on the ORIGINAL audio track.
+- Kotlin `StreamExtractorChannel.kt`, method `youpipe/stream_extractor.getAudioStreams({videoId, hl, gl})`, returns `{videoId, durationSeconds, streams: [{url, itag, mimeType, codec, bitrate, contentLength}]}` (`bitrate` in **kbps**). It keeps only progressive-HTTP streams on the ORIGINAL audio track.
+  - **DRC copies are dropped:** YouTube also serves "stable volume" copies of some itags (`ItagItem.isDrc()`), with compressed dynamic range and almost the same bitrate. They're only kept when nothing else is offered (`originalAudio`). This applies to playback, downloads and the cast proxy.
   - Error codes: `AGE_RESTRICTED`, `GEO_RESTRICTED`, `UNAVAILABLE`, `RECAPTCHA`, `EXTRACTION_FAILED` (plus `NO_STREAMS` from Dart).
   - It uses its own OkHttp `Downloader` and runs on a 3-thread executor.
 - `StreamResolver` (`lib/data/stream_resolver.dart`):
-  - **Format choice:** prefers Opus/WebM, then the highest bitrate (or the lowest for `AudioQuality.low`).
+  - **Format choice** (`StreamResolver.pick`, unit-tested): prefers Opus/WebM. `high` takes the highest bitrate (Opus 251, ~160 kbps), `normal` the highest at or below 100 kbps (250, ~70 kbps), `low` the lowest (249, ~50 kbps). Free YouTube tops out at 251; the 256 kbps streams need Premium.
   - **Caching:** caches per videoId until 10 minutes before the URL's `expire` parameter.
   - **Refresh:** `invalidate()` or `forceRefresh` fetch a new URL.
 - The player fetches a new URL once when a stream errors mid-song (see playback.md).
 
 - **Video mode:** `getVideoStream({videoId, hl, gl})` returns the best **muxed** progressive stream (video and audio in one file, at most 720p; YouTube only muxes **360p**, itag 18), plus the `userAgent` its client needs: `{url, height, mimeType, userAgent, durationSeconds}`, or `NO_VIDEO`. `StreamResolver.resolveVideo` caches it like audio. The `video_player` controller sends that User-Agent as a header.
+- **HD video (tested 2026-09-30):** `getVideoManifest({videoId, hl, gl, maxHeight, onlyBest})` builds a static **DASH manifest** from the video-only progressive streams (H.264 preferred, VP9 when there's no H.264; one Representation per height from 360p up to `maxHeight`) plus the best non-DRC audio stream. Each Representation has its `BaseURL` and `SegmentBase` index/init byte ranges from `ItagItem`. It returns `{mpd, height, userAgent, durationSeconds}`, or `NO_HD` when there are no usable video-only streams or nothing at 480p or more.
+  - `StreamResolver.resolveVideoManifest` writes the MPD to `<temp>/video/<videoId>_<quality>.mpd` and caches it until the URLs' `expire`.
+  - **Why this works without a native player:** `video_player_android` sends every URI except `asset:`/`rtsp:` through `HttpVideoAsset`, whose `DefaultDataSource` wraps the header-carrying HTTP data source. So a `file://` MPD with `formatHint: VideoFormat.dash` plays in ExoPlayer, and its googlevideo requests carry the User-Agent. Re-check this when bumping `video_player`.
 
 ## Stream URLs are bound to the client
 
