@@ -49,27 +49,78 @@ object StreamExtractorChannel {
                     }
                     val hl = call.argument<String>("hl") ?: "en"
                     val gl = call.argument<String>("gl") ?: "US"
-                    executor.execute {
-                        try {
-                            val data = getAudioStreams(videoId, hl, gl)
-                            mainHandler.post { result.success(data) }
-                        } catch (e: Throwable) {
-                            val code =
-                                when (e) {
-                                    is AgeRestrictedContentException -> "AGE_RESTRICTED"
-                                    is GeographicRestrictionException -> "GEO_RESTRICTED"
-                                    is ContentNotAvailableException -> "UNAVAILABLE"
-                                    is ReCaptchaException -> "RECAPTCHA"
-                                    else -> "EXTRACTION_FAILED"
-                                }
-                            mainHandler.post { result.error(code, e.message ?: e.javaClass.simpleName, null) }
-                        }
+                    run(result) { getAudioStreams(videoId, hl, gl) }
+                }
+
+                "getVideoStream" -> {
+                    val videoId = call.argument<String>("videoId")
+                    if (videoId.isNullOrBlank()) {
+                        result.error("BAD_ARGS", "videoId is required", null)
+                        return@setMethodCallHandler
                     }
+                    val hl = call.argument<String>("hl") ?: "en"
+                    val gl = call.argument<String>("gl") ?: "US"
+                    run(result) { getVideoStream(videoId, hl, gl) }
                 }
 
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun run(
+        result: MethodChannel.Result,
+        work: () -> Any?,
+    ) {
+        executor.execute {
+            try {
+                val data = work()
+                mainHandler.post { result.success(data) }
+            } catch (e: Throwable) {
+                val code =
+                    when (e) {
+                        is AgeRestrictedContentException -> "AGE_RESTRICTED"
+                        is GeographicRestrictionException -> "GEO_RESTRICTED"
+                        is ContentNotAvailableException -> "UNAVAILABLE"
+                        is ReCaptchaException -> "RECAPTCHA"
+                        is NoVideoException -> "NO_VIDEO"
+                        else -> "EXTRACTION_FAILED"
+                    }
+                mainHandler.post { result.error(code, e.message ?: e.javaClass.simpleName, null) }
+            }
+        }
+    }
+
+    private class NoVideoException(
+        videoId: String,
+    ) : Exception("No playable video stream for $videoId")
+
+    /**
+     * Video mode (docs/playback.md): the best progressive stream with both video and audio, at most
+     * 720p (in practice YouTube only muxes 360p). The User-Agent to play it with comes along, since
+     * the URL is bound to the InnerTube client that produced it.
+     */
+    private fun getVideoStream(
+        videoId: String,
+        hl: String,
+        gl: String,
+    ): Map<String, Any?> {
+        ensureInit(hl, gl)
+        val extractor = ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId")
+        extractor.fetchPage()
+        val best =
+            extractor.videoStreams
+                .filter { it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && it.isUrl && !it.isVideoOnly }
+                .filter { it.height in 1..720 }
+                .maxByOrNull { it.height } ?: throw NoVideoException(videoId)
+        return mapOf(
+            "videoId" to videoId,
+            "url" to best.content,
+            "height" to best.height,
+            "mimeType" to best.format?.mimeType,
+            "userAgent" to Googlevideo.userAgentFor(best.content),
+            "durationSeconds" to extractor.length,
+        )
     }
 
     fun ensureInit(

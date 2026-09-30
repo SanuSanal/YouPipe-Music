@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/account.dart';
 
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../innertube/models.dart';
 import '../../player/audio_handler.dart';
@@ -61,7 +62,7 @@ class PlayerScreen extends ConsumerWidget {
                     // Balances the Cast button so the toggle stays centred.
                     if (ref.watch(castStatusProvider).state != CastState.none) const SizedBox(width: 48),
                     const Spacer(),
-                    const _SongVideoToggle(),
+                    _SongVideoToggle(song: song),
                     const Spacer(),
                     const CastButton(),
                     IconButton(
@@ -73,16 +74,19 @@ class PlayerScreen extends ConsumerWidget {
               ),
               const CastingLabel(),
               const Spacer(),
-              Hero(
-                tag: 'player-art',
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 30, offset: Offset(0, 10))],
+              if (ref.watch(videoModeProvider))
+                _VideoView(song: song, width: size.width - 32)
+              else
+                Hero(
+                  tag: 'player-art',
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 30, offset: Offset(0, 10))],
+                    ),
+                    child: YtImage(thumbnails: song.thumbnails, size: artSize, radius: 8),
                   ),
-                  child: YtImage(thumbnails: song.thumbnails, size: artSize, radius: 8),
                 ),
-              ),
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -167,31 +171,92 @@ class PlayerScreen extends ConsumerWidget {
   }
 }
 
-class _SongVideoToggle extends StatelessWidget {
-  const _SongVideoToggle();
+/// Song / Video, as in YouTube Music. Video is offered when the song has a music video and
+/// nothing is being cast (docs/playback.md).
+class _SongVideoToggle extends ConsumerWidget {
+  const _SongVideoToggle({required this.song});
+
+  final SongItem song;
 
   @override
-  Widget build(BuildContext context) {
-    Widget seg(String label, bool selected) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0x33FFFFFF) : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w500,
-          color: selected ? YtmColors.textPrimary : YtmColors.textSecondary,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final handler = ref.read(audioHandlerProvider);
+    final videoMode = ref.watch(videoModeProvider);
+    final casting = ref.watch(castStatusProvider).connected;
+    final hasVideo = ref.watch(musicVideoProvider(song.videoId)).value != null;
+    final canVideo = videoMode || (hasVideo && !casting);
+
+    Widget seg(String label, {required bool selected, required bool enabled, required VoidCallback onTap}) => InkWell(
+      onTap: enabled && !selected ? onTap : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0x33FFFFFF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: selected
+                ? YtmColors.textPrimary
+                : enabled
+                ? YtmColors.textSecondary
+                : YtmColors.textSecondary.withValues(alpha: 0.4),
+          ),
         ),
       ),
     );
-    return Tooltip(
-      message: 'Video mode is coming later',
-      child: Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(color: const Color(0x1AFFFFFF), borderRadius: BorderRadius.circular(20)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [seg('Song', true), seg('Video', false)]),
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: const Color(0x1AFFFFFF), borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          seg('Song', selected: !videoMode, enabled: true, onTap: () => handler.setVideoMode(false)),
+          seg('Video', selected: videoMode, enabled: canVideo, onTap: () => handler.setVideoMode(true)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The music video in place of the artwork (16:9), with the artwork and a spinner until it's ready.
+class _VideoView extends ConsumerWidget {
+  const _VideoView({required this.song, required this.width});
+
+  final SongItem song;
+  final double width;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final height = width * 9 / 16;
+    return ValueListenableBuilder(
+      valueListenable: ref.watch(videoOutputProvider).controller,
+      builder: (context, controller, _) => ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: ColoredBox(
+            color: Colors.black,
+            child: controller == null || !controller.value.isInitialized
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Opacity(
+                        opacity: 0.35,
+                        child: YtImage(thumbnails: song.thumbnails, size: width),
+                      ),
+                      const Center(child: CircularProgressIndicator()),
+                    ],
+                  )
+                : Center(
+                    child: AspectRatio(aspectRatio: controller.value.aspectRatio, child: VideoPlayer(controller)),
+                  ),
+          ),
+        ),
       ),
     );
   }

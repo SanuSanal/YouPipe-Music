@@ -28,12 +28,16 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderStateMixin {
   late final _panel = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
   StreamSubscription<SkipSegment>? _skips;
+  StreamSubscription<SongItem>? _noVideo;
 
   @override
   void initState() {
     super.initState();
     _skips = ref.read(audioHandlerProvider).skippedSegments.stream.listen((_) {
       if (mounted) showSnack(context, 'Skipped non-music section');
+    });
+    _noVideo = ref.read(audioHandlerProvider).noVideo.stream.listen((_) {
+      if (mounted) showSnack(context, 'No video for this song');
     });
     // Look for a new release once the app has settled, so the check doesn't compete with startup.
     Future.delayed(const Duration(seconds: 3), () async {
@@ -45,6 +49,7 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
   @override
   void dispose() {
     _skips?.cancel();
+    _noVideo?.cancel();
     _panel.dispose();
     super.dispose();
   }

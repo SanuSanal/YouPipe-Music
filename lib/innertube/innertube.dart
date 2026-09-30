@@ -4,6 +4,7 @@ import 'auth.dart';
 import 'clients.dart';
 import 'json_nav.dart';
 import 'models.dart';
+import 'music_video.dart';
 import 'parsers/pages.dart';
 
 export 'models.dart';
@@ -122,6 +123,15 @@ class InnerTube {
 
   Future<SearchPage> search(String query, {SearchFilter? filter}) async =>
       parseSearch(await _post('search', {'query': query, 'params': ?filter?.params}));
+
+  /// Video mode: the music video to show for [song]. A song that already is a video plays itself;
+  /// otherwise the best match from a Videos search. Anonymous `next` responses no longer carry the
+  /// song ↔ video counterpart, so this is a search (docs/innertube.md).
+  Future<String?> musicVideoFor(SongItem song) async {
+    if (song.isVideo) return song.videoId;
+    final page = await search('${song.title} ${song.artists.firstOrNull?.name ?? ''}', filter: SearchFilter.videos);
+    return pickMusicVideo(song, [...page.items.whereType<SongItem>()])?.videoId;
+  }
 
   Future<SearchPage> searchContinuation(String token) async =>
       parseSearchContinuation(await _continuation('search', token));

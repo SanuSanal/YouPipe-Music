@@ -62,4 +62,12 @@ void main() {
       expect(page.sections, isNotEmpty, reason: shortcut.title);
     }
   });
+
+  test('music video for a song (video mode)', () async {
+    final songs = await yt.search('despacito luis fonsi', filter: SearchFilter.songs);
+    final song = songs.items.whereType<SongItem>().firstWhere((s) => !s.isVideo);
+    final video = await yt.musicVideoFor(song);
+    expect(video, isNotNull);
+    expect(video, isNot(song.videoId));
+  });
 }

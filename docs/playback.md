@@ -47,6 +47,27 @@
 
 - **Casting (Chromecast, DLNA):** while a device is connected, `_loadIndex` loads songs on it and the transport follows it (`handler.cast`). See [cast.md](cast.md).
 
+## Outputs and video mode
+
+- **Outputs:** songs play on one output at a time. It's picked in `_syncOutput`:
+  1. the **Cast device** while casting;
+  2. otherwise the **video output** in video mode;
+  3. otherwise the phone's own just_audio player.
+- **Shared routing:** the Cast device and the video output are both `RemotePlayback`s on the same path.
+  - `_loadIndex` loads on them.
+  - `play`, `pause`, `seek`, position, completion and `playbackState` follow them.
+  - Switching outputs pauses the old one and continues on the new one from the same position, keeping it playing if it was. The one exception: when casting ends, the phone is left paused, as YTM does.
+- **Video mode** (the full player's Song/Video toggle, `handler.setVideoMode`, `videoModeProvider`):
+  - `VideoOutput` (`lib/player/video_output.dart`) plays the song's music video (see innertube.md, "Music videos") with `video_player` (ExoPlayer).
+  - v1 uses the muxed 360p stream, so there's no separate audio to sync.
+  - Options: `allowBackgroundPlayback: true` (the video keeps playing as sound in the background, so the notification and lock screen player carry on) and `mixWithOthers: true` (no audio-focus fight with just_audio).
+  - **Next / auto-advance** stay in video mode.
+  - **A song without a video** falls back to the song (`handler.noVideo`, toast "No video for this song").
+  - **Casting** turns video mode off.
+  - **SponsorBlock** loads segments for the video's own id.
+  - **Downloads** don't apply: video mode always streams.
+  - Planned next: HD, i.e. video-only DASH streams merged with the audio stream in a native ExoPlayer, plus a quality setting.
+
 ## Android Auto (`auto_browser.dart`)
 
 - The handler's `getChildren`, `playFromMediaId`, `search` and `playFromSearch` delegate to `AutoBrowser`, which `autoBrowserProvider` sets up.

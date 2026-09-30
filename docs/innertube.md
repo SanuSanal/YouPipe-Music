@@ -51,6 +51,16 @@
 - **Empty library pages** return an `itemSectionRenderer` holding a `messageRenderer`, which parses to zero items and is not an error.
 - **Account playlist ids:** `LM` is Liked Music and `SE` is Episodes for Later (hidden, since podcasts are unsupported).
 
+## Music videos (video mode)
+
+- **The anonymous `next` response no longer links a song to its music video.** As of 2026-09, the `playlistPanelVideoWrapperRenderer.counterpart` / `segmentMap` that YouTube Music once sent is missing for WEB_REMIX, ANDROID_MUSIC and IOS_MUSIC, with `isAudioOnly` true or false. It may still exist for signed-in users.
+- So `InnerTube.musicVideoFor(song)` works like this:
+  - a song that already is a video (`isVideo`) plays itself;
+  - otherwise it runs a **Videos search** for `"<title> <first artist>"`;
+  - `pickMusicVideo` (`innertube/music_video.dart`) takes the first video whose title contains the song title (brackets stripped from the inside out, e.g. `[… (TM) …]`) and that shares an artist, or names one in its title.
+- It's a heuristic: it can miss, and it can pick a live or lyric video. `MusicVideoFinder` (providers.dart) caches the answer per song.
+- Without a segment map, song and video positions aren't aligned. Switching keeps the same timestamp.
+
 ## Fixtures
 
 - `test/innertube/fixtures/*.json` are real anonymous responses. `tool/record_fixtures.py test/innertube/fixtures` re-records them.
