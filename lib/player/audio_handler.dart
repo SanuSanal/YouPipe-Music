@@ -972,6 +972,10 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
+  /// Swiping the app away from recent apps stops the music (and the notification and service).
+  @override
+  Future<void> onTaskRemoved() => stop();
+
   @override
   Future<void> stop() async {
     _retryTimer?.cancel();
