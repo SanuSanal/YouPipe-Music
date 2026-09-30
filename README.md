@@ -36,6 +36,7 @@ A free, ad-free YouTube Music client for Android, with background playback, offl
     <td align="center"><img src="assets/screenshots/explore.webp" width="200" alt="Explore: new releases, charts, moods" /><br/><sub><b>Explore</b></sub></td>
     <td align="center"><img src="assets/screenshots/album.webp" width="200" alt="Album page" /><br/><sub><b>Albums</b></sub></td>
     <td align="center"><img src="assets/screenshots/upnext.webp" width="200" alt="Up next queue with endless radio" /><br/><sub><b>Up next</b></sub></td>
+    <td align="center"><img src="assets/screenshots/video.webp" width="200" alt="Video mode: the song's music video" /><br/><sub><b>Video mode</b></sub></td>
   </tr>
 </table>
 
@@ -48,6 +49,7 @@ A free, ad-free YouTube Music client for Android, with background playback, offl
 - **No ads**, ever
 - Background playback with notification and lock-screen controls
 - An optional full-screen **lock screen player**: the album art fills the screen, with a clock and big controls
+- Switch any song to its **music video** with the Song/Video toggle
 - Endless radio and "Up next" from any song
 - Shuffle, repeat and queue editing
 
