@@ -14,6 +14,7 @@ flutter test --tags live --run-skipped   # hits the real InnerTube API (smoke te
 | `test/innertube/live_test.dart` | Home, chips, continuations, search, album/artist/playlist, radio, lyrics, explore against the live API. Tagged `live` and skipped by default (`dart_test.yaml`) |
 | `test/auth_test.dart` | Cookie parsing and SAPISIDHASH |
 | `test/lyrics_test.dart` | LRC parsing, active line, title cleaning |
+| `test/stream_resolver_test.dart` | Audio stream choice for Low/Normal/High (Opus first, AAC fallback) |
 | `test/auto_browser_test.dart` | The Android Auto tree, using a Dio interceptor that serves fixtures and an in-memory drift DB (`NativeDatabase.memory()`) |
 
 - **Mocking InnerTube:** pass a `Dio` with an interceptor that resolves requests to fixture JSON (see `auto_browser_test.dart`).

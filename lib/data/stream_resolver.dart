@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 class AudioStreamInfo {
   const AudioStreamInfo({
@@ -26,6 +30,8 @@ class AudioStreamInfo {
   final int itag;
   final String? mimeType;
   final String? codec;
+
+  /// kbps.
   final int bitrate;
   final int? contentLength;
 
@@ -39,13 +45,16 @@ class AudioStreamInfo {
   }
 }
 
-/// A muxed (video + audio) stream for video mode, with the User-Agent its client requires.
+/// A stream for video mode, with the User-Agent its client requires: either YouTube's muxed 360p
+/// stream ([url]), or a local DASH manifest ([manifestPath]) joining HD video-only streams with audio.
 class VideoStreamInfo {
-  const VideoStreamInfo({required this.url, required this.userAgent, this.height});
+  const VideoStreamInfo({required this.url, required this.userAgent, this.height, this.manifestPath});
 
+  /// The muxed stream, or for a manifest one of the googlevideo URLs in it (for its expiry).
   final String url;
   final String userAgent;
   final int? height;
+  final String? manifestPath;
 
   DateTime? get expiresAt {
     final s = Uri.tryParse(url)?.queryParameters['expire'];
@@ -54,7 +63,11 @@ class VideoStreamInfo {
   }
 }
 
-enum AudioQuality { low, high }
+enum AudioQuality { low, normal, high }
+
+/// Video mode's quality (docs/playback.md): `auto` lets ExoPlayer pick 360p–1080p by bandwidth,
+/// `high` keeps the tallest (up to 1080p), `dataSaver` plays the muxed 360p stream.
+enum VideoQuality { auto, high, dataSaver }
 
 class StreamResolveException implements Exception {
   StreamResolveException(this.code, this.message);
@@ -108,22 +121,29 @@ class StreamResolver {
         .toList();
     if (streams.isEmpty) throw StreamResolveException('NO_STREAMS', 'No audio streams for $videoId');
 
-    final best = _pick(streams);
+    final best = pick(streams, quality);
+    debugPrint('YouPipe: audio $videoId itag ${best.itag} ${best.codec} ${best.bitrate} kbps (${quality.name})');
     _cache[videoId] = best;
     return best;
   }
 
-  /// Prefers Opus (better quality per bit) and picks the highest or lowest bitrate by setting.
-  AudioStreamInfo _pick(List<AudioStreamInfo> streams) {
+  /// Prefers Opus (better quality per bit). High takes the highest bitrate, low the lowest, and
+  /// normal the highest at or below 100 kbps (Opus 250, ~70 kbps).
+  @visibleForTesting
+  static AudioStreamInfo pick(List<AudioStreamInfo> streams, AudioQuality quality) {
     final opus = streams.where((s) => s.isOpus).toList();
-    final pool = opus.isNotEmpty ? opus : streams;
-    pool.sort((a, b) => a.bitrate.compareTo(b.bitrate));
-    return quality == AudioQuality.high ? pool.last : pool.first;
+    final pool = (opus.isNotEmpty ? opus : List.of(streams))..sort((a, b) => a.bitrate.compareTo(b.bitrate));
+    return switch (quality) {
+      AudioQuality.high => pool.last,
+      AudioQuality.low => pool.first,
+      AudioQuality.normal => pool.lastWhere((s) => s.bitrate <= 100, orElse: () => pool.first),
+    };
   }
 
   void invalidate(String videoId) {
     _cache.remove(videoId);
     _videoCache.remove(videoId);
+    _manifestCache.removeWhere((k, _) => k.startsWith('$videoId/'));
   }
 
   final _videoCache = <String, VideoStreamInfo>{};
@@ -151,5 +171,47 @@ class StreamResolver {
     } on PlatformException catch (e) {
       throw StreamResolveException(e.code, e.message ?? 'Video extraction failed');
     }
+  }
+
+  final _manifestCache = <String, VideoStreamInfo>{};
+
+  /// HD video mode: a DASH manifest of the video-only streams up to 1080p plus the audio, saved to a
+  /// local file that `video_player` (ExoPlayer) plays. Throws `NO_HD` when there's nothing to build it from.
+  Future<VideoStreamInfo> resolveVideoManifest(String videoId, VideoQuality quality) async {
+    final key = '$videoId/${quality.name}';
+    final cached = _manifestCache[key];
+    final expiry = cached?.expiresAt;
+    if (cached != null &&
+        expiry != null &&
+        expiry.isAfter(DateTime.now().add(const Duration(minutes: 10))) &&
+        File(cached.manifestPath!).existsSync()) {
+      return cached;
+    }
+    final Map<Object?, Object?> r;
+    try {
+      r = (await _channel.invokeMapMethod<Object?, Object?>('getVideoManifest', {
+        'videoId': videoId,
+        'hl': hl,
+        'gl': gl,
+        'maxHeight': 1080,
+        'onlyBest': quality == VideoQuality.high,
+      }))!;
+    } on PlatformException catch (e) {
+      throw StreamResolveException(e.code, e.message ?? 'Video extraction failed');
+    }
+    final mpd = r['mpd'] as String;
+    final dir = Directory('${(await getTemporaryDirectory()).path}/video');
+    await dir.create(recursive: true);
+    final file = File('${dir.path}/${videoId}_${quality.name}.mpd');
+    await file.writeAsString(mpd);
+    final firstUrl = RegExp(r'<BaseURL>([^<]+)</BaseURL>').firstMatch(mpd)?.group(1)?.replaceAll('&amp;', '&') ?? '';
+    final info = VideoStreamInfo(
+      url: firstUrl,
+      userAgent: r['userAgent'] as String,
+      height: r['height'] as int?,
+      manifestPath: file.path,
+    );
+    _manifestCache[key] = info;
+    return info;
   }
 }

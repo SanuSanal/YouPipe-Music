@@ -93,6 +93,7 @@ final libraryProvider = Provider<LibraryRepository>((ref) => LibraryRepository(r
 class AppSettings {
   const AppSettings({
     this.quality = AudioQuality.high,
+    this.videoQuality = VideoQuality.auto,
     this.hl = 'en',
     this.gl = 'US',
     this.saveHistory = true,
@@ -102,6 +103,7 @@ class AppSettings {
   });
 
   final AudioQuality quality;
+  final VideoQuality videoQuality;
   final String hl;
   final String gl;
   final bool saveHistory;
@@ -117,6 +119,7 @@ class AppSettings {
 
   AppSettings copyWith({
     AudioQuality? quality,
+    VideoQuality? videoQuality,
     String? hl,
     String? gl,
     bool? saveHistory,
@@ -125,6 +128,7 @@ class AppSettings {
     bool? lockScreenPlayer,
   }) => AppSettings(
     quality: quality ?? this.quality,
+    videoQuality: videoQuality ?? this.videoQuality,
     hl: hl ?? this.hl,
     gl: gl ?? this.gl,
     saveHistory: saveHistory ?? this.saveHistory,
@@ -143,7 +147,8 @@ class SettingsController extends Notifier<AppSettings> {
   AppSettings build() {
     final p = ref.watch(prefsProvider);
     final s = AppSettings(
-      quality: AudioQuality.values.byName(p.getString('quality') ?? AudioQuality.high.name),
+      quality: AudioQuality.values.asNameMap()[p.getString('quality')] ?? AudioQuality.high,
+      videoQuality: VideoQuality.values.asNameMap()[p.getString('videoQuality')] ?? VideoQuality.auto,
       hl: p.getString('hl') ?? 'en',
       gl: p.getString('gl') ?? 'US',
       saveHistory: p.getBool('saveHistory') ?? true,
@@ -171,6 +176,7 @@ class SettingsController extends Notifier<AppSettings> {
     state = s;
     _apply(s);
     await _prefs.setString('quality', s.quality.name);
+    await _prefs.setString('videoQuality', s.videoQuality.name);
     await _prefs.setString('hl', s.hl);
     await _prefs.setString('gl', s.gl);
     await _prefs.setBool('saveHistory', s.saveHistory);
@@ -466,6 +472,8 @@ final videoOutputProvider = Provider<VideoOutput>((ref) {
       return song == null ? null : finder.find(song);
     },
     resolve: ref.read(streamResolverProvider).resolveVideo,
+    resolveHd: ref.read(streamResolverProvider).resolveVideoManifest,
+    quality: () => ref.read(settingsProvider).videoQuality,
   );
   handler.video = video;
   return video;

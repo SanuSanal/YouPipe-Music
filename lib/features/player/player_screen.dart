@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +20,7 @@ import '../../ui/widgets/collection_header.dart';
 import '../../ui/widgets/item_menu.dart';
 import '../../ui/widgets/thumbnail.dart';
 import 'queue_sheet.dart';
+import 'video_fullscreen.dart';
 
 String formatDuration(Duration d) {
   final h = d.inHours;
@@ -156,7 +159,7 @@ class PlayerScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _SeekBar(song: song),
+                    SeekBar(song: song),
                     const _Controls(),
                   ],
                 ),
@@ -223,41 +226,107 @@ class _SongVideoToggle extends ConsumerWidget {
 }
 
 /// The music video in place of the artwork (16:9), with the artwork and a spinner until it's ready.
-class _VideoView extends ConsumerWidget {
+/// Tapping it shows the full screen button for a few seconds (it also shows when a video starts).
+class _VideoView extends ConsumerStatefulWidget {
   const _VideoView({required this.song, required this.width});
 
   final SongItem song;
   final double width;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_VideoView> createState() => _VideoViewState();
+}
+
+class _VideoViewState extends ConsumerState<_VideoView> {
+  bool _overlay = false;
+  Timer? _hide;
+  VideoPlayerController? _shownFor;
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    super.dispose();
+  }
+
+  void _showOverlay() {
+    _hide?.cancel();
+    setState(() => _overlay = true);
+    _hide = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _overlay = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = widget.width;
     final height = width * 9 / 16;
     return ValueListenableBuilder(
       valueListenable: ref.watch(videoOutputProvider).controller,
-      builder: (context, controller, _) => ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: ColoredBox(
-            color: Colors.black,
-            child: controller == null || !controller.value.isInitialized
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Opacity(
-                        opacity: 0.35,
-                        child: YtImage(thumbnails: song.thumbnails, size: width),
+      builder: (context, controller, _) {
+        final ready = controller != null && controller.value.isInitialized;
+        if (ready && !identical(controller, _shownFor)) {
+          _shownFor = controller;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showOverlay();
+          });
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: ColoredBox(
+              color: Colors.black,
+              child: !ready
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Opacity(
+                          opacity: 0.35,
+                          child: YtImage(thumbnails: widget.song.thumbnails, size: width),
+                        ),
+                        const Center(child: CircularProgressIndicator()),
+                      ],
+                    )
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _overlay ? setState(() => _overlay = false) : _showOverlay(),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Center(
+                            child: AspectRatio(
+                              aspectRatio: controller.value.aspectRatio,
+                              child: VideoPlayer(controller),
+                            ),
+                          ),
+                          Positioned(
+                            right: 4,
+                            bottom: 4,
+                            child: IgnorePointer(
+                              ignoring: !_overlay,
+                              child: AnimatedOpacity(
+                                opacity: _overlay ? 1 : 0,
+                                duration: const Duration(milliseconds: 200),
+                                child: IconButton(
+                                  icon: const Icon(Icons.fullscreen, size: 28),
+                                  tooltip: 'Full screen',
+                                  style: IconButton.styleFrom(backgroundColor: const Color(0x66000000)),
+                                  onPressed: () {
+                                    setState(() => _overlay = false);
+                                    openVideoFullscreen(context);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const Center(child: CircularProgressIndicator()),
-                    ],
-                  )
-                : Center(
-                    child: AspectRatio(aspectRatio: controller.value.aspectRatio, child: VideoPlayer(controller)),
-                  ),
+                    ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -293,16 +362,17 @@ class _Pill extends StatelessWidget {
   );
 }
 
-class _SeekBar extends ConsumerStatefulWidget {
-  const _SeekBar({required this.song});
+/// The player's seek bar with elapsed and total time; also used by the full-screen video.
+class SeekBar extends ConsumerStatefulWidget {
+  const SeekBar({super.key, required this.song});
 
   final SongItem song;
 
   @override
-  ConsumerState<_SeekBar> createState() => _SeekBarState();
+  ConsumerState<SeekBar> createState() => _SeekBarState();
 }
 
-class _SeekBarState extends ConsumerState<_SeekBar> {
+class _SeekBarState extends ConsumerState<SeekBar> {
   double? _dragValue;
 
   @override

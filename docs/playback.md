@@ -5,10 +5,16 @@
 `BaseAudioHandler with SeekHandler` wrapping one `just_audio` `AudioPlayer`. It provides background playback, the notification, lockscreen and headset controls, and Android Auto.
 
 - **The queue lives in the handler** as `ValueNotifier<QueueState>` (songs, index, shuffle, repeat, title). audio_service's `queue`/`mediaItem` are kept in sync for the system UI. The UI reads it through `queueStateProvider`, `currentSongProvider`, `playbackStateProvider` and `positionProvider`.
-- **One song is loaded at a time** (`_loadIndex`), not a just_audio playlist, because stream URLs expire and are resolved lazily. Order of work:
+- **The current song plus the next one** are loaded, not the whole queue, because stream URLs expire and are resolved lazily. `_loadIndex` loads a song:
   1. If `localFile(videoId)` finds a download, play that file.
   2. Otherwise resolve the stream URL.
-  3. Call `setAudioSource`, play, and pre-resolve the next song (`_prefetchNext`).
+  3. Call `setAudioSource`, play, and preload the next song (`_syncPreloaded`).
+- **Preloading the next song (gapless):** on the phone's own player, just_audio's playlist is `[current, upcoming]`. ExoPlayer buffers the upcoming song before the current one ends and moves on with no gap.
+  - `_upcomingIndex()` is the next queue index, or `0` with repeat-all at the end. It's null with repeat-one, with sleep-at-end-of-song, or at the end of the queue; then nothing is preloaded and `_onCompleted` handles the end as before.
+  - `_syncPreloaded()` rebuilds the second slot. It runs after every queue edit, shuffle, repeat or sleep-at-end change. The work is serialized on `_preloadOp` and guarded by `_loadGeneration`.
+  - `_onPlayerIndex` (on `currentIndexStream`) handles the automatic move: it publishes the new queue index, media item and SponsorBlock segments, then preloads the one after.
+  - Skipping to the preloaded song (Next, SponsorBlock ending a song, tapping it in Up next) uses `seekToNext()` in place of a reload.
+  - Cast and video mode don't preload; their `_loadIndex` path is unchanged.
 - **Stale-load guard:** `_loadGeneration` makes sure a slow load can't override a newer choice.
 - **Error recovery:** a player error fetches a new URL once and resumes at the same position (`_retriedCurrent`). Pressing play in the error state retries.
 - **Completion:** repeat-one replays; otherwise the next song plays; with repeat-all at the end it wraps; otherwise it stops at 0.
@@ -59,14 +65,15 @@
   - Switching outputs pauses the old one and continues on the new one from the same position, keeping it playing if it was. The one exception: when casting ends, the phone is left paused, as YTM does.
 - **Video mode** (the full player's Song/Video toggle, `handler.setVideoMode`, `videoModeProvider`):
   - `VideoOutput` (`lib/player/video_output.dart`) plays the song's music video (see innertube.md, "Music videos") with `video_player` (ExoPlayer).
-  - v1 uses the muxed 360p stream, so there's no separate audio to sync.
+  - **Quality** (setting `videoQuality`): `auto` plays a local DASH manifest of the 360p–1080p video-only streams (it starts low and steps up) plus the audio, and ExoPlayer picks the height by bandwidth. `high` keeps only the tallest one up to 1080p. `dataSaver` plays the muxed 360p stream. When there's no HD (`NO_HD`, or the manifest fails to initialize) it falls back to 360p. See streaming.md.
   - Options: `allowBackgroundPlayback: true` (the video keeps playing as sound in the background, so the notification and lock screen player carry on) and `mixWithOthers: true` (no audio-focus fight with just_audio).
   - **Next / auto-advance** stay in video mode.
   - **A song without a video** falls back to the song (`handler.noVideo`, toast "No video for this song").
   - **Casting** turns video mode off.
+  - **Full screen:** see ui.md.
   - **SponsorBlock** loads segments for the video's own id.
   - **Downloads** don't apply: video mode always streams.
-  - Planned next: HD, i.e. video-only DASH streams merged with the audio stream in a native ExoPlayer, plus a quality setting.
+  - Planned next: song↔video position alignment (music videos often have a longer intro than the song).
 
 ## Android Auto (`auto_browser.dart`)
 
