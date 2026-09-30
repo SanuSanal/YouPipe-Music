@@ -15,6 +15,7 @@ flutter test --tags live --run-skipped   # hits the real InnerTube API (smoke te
 | `test/auth_test.dart` | Cookie parsing and SAPISIDHASH |
 | `test/lyrics_test.dart` | LRC parsing, active line, title cleaning |
 | `test/stream_resolver_test.dart` | Audio stream choice for Low/Normal/High (Opus first, AAC fallback) |
+| `test/audio_effects_test.dart` | The equalizer channel wrapper: a refused equalizer is reported unavailable and logged, never thrown |
 | `test/auto_browser_test.dart` | The Android Auto tree, using a Dio interceptor that serves fixtures and an in-memory drift DB (`NativeDatabase.memory()`) |
 
 - **Mocking InnerTube:** pass a `Dio` with an interceptor that resolves requests to fixture JSON (see `auto_browser_test.dart`).
@@ -36,6 +37,6 @@ flutter test --tags live --run-skipped   # hits the real InnerTube API (smoke te
 1. Search → play → background with the screen off: position keeps moving past 60 s. That's the PO-token cap; if it stops there, streams are broken.
 2. Radio fills the Up next queue; auto-advance works; the notification controls work.
 3. The album, artist and playlist pages load; the top bar turns solid on scroll.
-4. Synced lyrics highlight lines; the equalizer preset changes the bands.
+4. Synced lyrics highlight lines; the equalizer preset changes the bands and the sound. The EQ still applies after swiping the app away and playing again.
 5. Downloading a song finishes and it plays from the local file.
 6. Back closes a sheet first, then collapses the player.

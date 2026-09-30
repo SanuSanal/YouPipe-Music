@@ -10,6 +10,7 @@ import '../data/error_log.dart';
 import '../data/sponsorblock.dart';
 import '../data/stream_resolver.dart';
 import '../innertube/models.dart';
+import 'audio_effects.dart';
 import 'auto_browser.dart';
 import 'cast.dart';
 import 'video_output.dart';
@@ -83,16 +84,17 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       if (_retries > 0 && !_recovering && p > _retryFrom + const Duration(seconds: 20)) _retries = 0;
     });
     _remotePositions.stream.listen(_skipSegments);
+    // A new session comes with each native player (after stop(), for example).
+    _player.androidAudioSessionIdStream.distinct().listen(effects.attach);
     _initSession();
   }
 
   final StreamResolver _resolver;
 
-  /// Android audio effects, configured from the Equalizer sheet.
-  final equalizer = AndroidEqualizer();
-  final loudness = AndroidLoudnessEnhancer();
+  /// Equalizer and loudness boost, configured from the Equalizer sheet. They're attached natively
+  /// to the player's audio session, not through just_audio's AudioPipeline (docs/playback.md).
+  final effects = AudioEffects();
   late final _player = AudioPlayer(
-    audioPipeline: AudioPipeline(androidAudioEffects: [loudness, equalizer]),
     // Buffer minutes ahead rather than ExoPlayer's 50 s, so short losses of signal (tunnels,
     // driving) pass unnoticed. At ~160 kbps that's only a few MB.
     audioLoadConfiguration: const AudioLoadConfiguration(
@@ -957,19 +959,11 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   // Audio effects ------------------------------------------------------------------------------
 
-  /// Re-applies saved equalizer settings; band gains are set once the effect is active.
+  /// Re-applies saved equalizer settings; the native side applies them whenever a session attaches.
   void restoreAudioEffects({required bool eqEnabled, required List<double> gains, required double loudnessDb}) {
-    equalizer.setEnabled(eqEnabled);
-    loudness.setEnabled(loudnessDb > 0);
-    loudness.setTargetGain(loudnessDb);
-    if (gains.isEmpty) return;
-    unawaited(
-      equalizer.parameters.then((p) async {
-        for (final band in p.bands) {
-          if (band.index < gains.length) await band.setGain(gains[band.index]);
-        }
-      }),
-    );
+    unawaited(effects.setGains(gains));
+    unawaited(effects.setEqEnabled(eqEnabled));
+    unawaited(effects.setLoudness(loudnessDb));
   }
 
   /// Swiping the app away from recent apps stops the music (and the notification and service).
