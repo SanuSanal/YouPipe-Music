@@ -82,4 +82,5 @@
   - Browsable: `folder:home|liked|downloads|playlists|history`, `home:<n>`, `playlist:<id>`, `album:<id>`, `local:<id>`.
   - Playable: `<parentId>|<index>` plays the whole list from that index; `song:<videoId>` (search results) starts a radio.
 - Manifest: `com.google.android.gms.car.application` → `res/xml/automotive_app_desc.xml`.
-- Covered by `test/auto_browser_test.dart`. **It has not been run on a car or the Desktop Head Unit (DHU) yet.**
+- Covered by `test/auto_browser_test.dart`. Tested on a real car on 2026-09-30: playback, and the app in the car's launcher.
+- **Sideloaded builds are hidden from the car's launcher.** Android Auto only lists apps installed from the Play Store until the user turns on **Unknown sources**: open Android Auto's settings, tap **Version** about 10 times, then go to ⋮ → **Developer settings** → **Unknown sources**. The app may also need adding with **Customize launcher**. Without this, playback still shows in the car, because Android Auto displays any active media session as "now playing". The app can't change this, so the step is in the README and the website FAQ.

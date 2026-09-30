@@ -84,6 +84,8 @@ Grab the latest APK from the **[Releases page](https://github.com/SanuSanal/YouP
 
 > [!NOTE]
 > YouPipe Music isn't on the Play Store. Android may ask you to allow installs from your browser or file manager the first time.
+>
+> **Android Auto:** apps from outside the Play Store are hidden in the car until you turn them on. Open Android Auto's settings, tap **Version** about 10 times, then go to ⋮ → **Developer settings** → **Unknown sources**. If YP Music still isn't in the car's launcher, add it with **Customize launcher**.
 
 ---
 
