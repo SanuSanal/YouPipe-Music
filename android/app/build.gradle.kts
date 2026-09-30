@@ -82,5 +82,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Lock screen player: talks to audio_service's media session (audio_service keeps this internal).
     implementation("androidx.media:media:1.7.0")
+    // Chromecast: the Cast SDK and MediaRouter for the device list (docs/cast.md).
+    implementation("com.google.android.gms:play-services-cast-framework:22.3.1")
+    implementation("androidx.mediarouter:mediarouter:1.8.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }

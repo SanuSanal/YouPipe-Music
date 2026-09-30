@@ -17,6 +17,7 @@ import 'data/updater.dart';
 import 'innertube/innertube.dart';
 import 'player/audio_handler.dart';
 import 'player/auto_browser.dart';
+import 'player/cast.dart';
 
 // ---------------------------------------------------------------------------------------------
 // Core services (created in main() and injected with overrides)
@@ -412,7 +413,26 @@ final playbackStateProvider = StreamProvider<PlaybackState>((ref) => ref.watch(a
 
 final currentSongProvider = Provider<SongItem?>((ref) => ref.watch(queueStateProvider).value?.current);
 
-final positionProvider = StreamProvider<Duration>((ref) => ref.watch(audioHandlerProvider).positionStream);
+final positionProvider = StreamProvider<Duration>((ref) {
+  // The handler follows the receiver while casting: re-subscribe when that switches.
+  ref.watch(castStatusProvider.select((s) => s.connected));
+  return ref.watch(audioHandlerProvider).positionStream;
+});
+
+/// Chromecast (docs/cast.md). Watched from the app root, so the handler gets it at startup.
+final castControllerProvider = Provider<CastController>((ref) {
+  final cast = CastController();
+  ref.read(audioHandlerProvider).cast = cast;
+  return cast;
+});
+
+final castStatusProvider = Provider<CastStatus>((ref) {
+  final status = ref.watch(castControllerProvider).status;
+  void changed() => ref.invalidateSelf();
+  status.addListener(changed);
+  ref.onDispose(() => status.removeListener(changed));
+  return status.value;
+});
 
 final playerActionsProvider = Provider<PlayerActions>((ref) => PlayerActions(ref));
 

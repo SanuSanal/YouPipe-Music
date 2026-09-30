@@ -16,6 +16,7 @@
   - Android Auto browsing.
   - Google sign-in with account library and like/save/subscribe sync, plus "Save to library".
 - **Lock screen player** (opt-in, Resso-style; see [lockscreen.md](lockscreen.md)).
+- **Casting** to DLNA TVs/speakers and Chromecast, with the phone relaying the audio (see [cast.md](cast.md)). DLNA is tested on a Samsung TV; Chromecast isn't tested on a real device yet.
 - **Releases:** signed APKs are published to GitHub Releases by a tag-triggered workflow (see [release.md](release.md)), and the app updates itself from them (see [updates.md](updates.md)).
 
 ## Next (not started)
@@ -23,7 +24,7 @@
 - **Return YouTube Dislike** (dislike counts).
 - **Remote client config** (JSON hosted on GitHub) so client version or player fixes can ship without an app release.
 - **Video mode:** the player's Song/Video toggle is a stub.
-- **Discord status, Chromecast, home-screen widget, backup import/export, localisation, tablet layout.**
+- **Discord status, home-screen widget, backup import/export, localisation, tablet layout.**
 - **Lyrics translation.**
 
 ## Known issues and gaps

@@ -11,5 +11,16 @@ class MainActivity : AudioServiceActivity() {
         CookieChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         UpdateChannel(this).register(flutterEngine.dartExecutor.binaryMessenger)
         LockScreenLauncher.register(this, flutterEngine.dartExecutor.binaryMessenger)
+        CastChannel.register(this, flutterEngine.dartExecutor.binaryMessenger)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        CastChannel.setForeground(true)
+    }
+
+    override fun onPause() {
+        CastChannel.setForeground(false)
+        super.onPause()
     }
 }

@@ -8,9 +8,11 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../innertube/models.dart';
 import '../../player/audio_handler.dart';
+import '../../player/cast.dart';
 import '../../providers.dart';
 import '../../ui/navigation.dart';
 import '../../ui/theme/ytm_theme.dart';
+import '../../ui/widgets/cast_button.dart';
 import '../../ui/widgets/collection_header.dart';
 import '../../ui/widgets/item_menu.dart';
 import '../../ui/widgets/thumbnail.dart';
@@ -50,15 +52,18 @@ class PlayerScreen extends ConsumerWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar: collapse, Song/Video toggle, menu.
+              // Top bar: collapse, Song/Video toggle, Cast, menu.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
                     IconButton(icon: const Icon(Icons.keyboard_arrow_down, size: 30), onPressed: onCollapse),
+                    // Balances the Cast button so the toggle stays centred.
+                    if (ref.watch(castStatusProvider).state != CastState.none) const SizedBox(width: 48),
                     const Spacer(),
                     const _SongVideoToggle(),
                     const Spacer(),
+                    const CastButton(),
                     IconButton(
                       icon: const Icon(Icons.more_vert),
                       onPressed: () => showItemMenu(context, ref, song, inPlayer: true),
@@ -66,6 +71,7 @@ class PlayerScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              const CastingLabel(),
               const Spacer(),
               Hero(
                 tag: 'player-art',
