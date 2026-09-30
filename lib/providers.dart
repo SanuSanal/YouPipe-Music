@@ -18,6 +18,7 @@ import 'innertube/innertube.dart';
 import 'player/audio_handler.dart';
 import 'player/auto_browser.dart';
 import 'player/cast.dart';
+import 'player/video_output.dart';
 
 // ---------------------------------------------------------------------------------------------
 // Core services (created in main() and injected with overrides)
@@ -416,6 +417,7 @@ final currentSongProvider = Provider<SongItem?>((ref) => ref.watch(queueStatePro
 final positionProvider = StreamProvider<Duration>((ref) {
   // The handler follows the receiver while casting: re-subscribe when that switches.
   ref.watch(castStatusProvider.select((s) => s.connected));
+  ref.watch(videoModeProvider);
   return ref.watch(audioHandlerProvider).positionStream;
 });
 
@@ -424,6 +426,57 @@ final castControllerProvider = Provider<CastController>((ref) {
   final cast = CastController();
   ref.read(audioHandlerProvider).cast = cast;
   return cast;
+});
+
+// Video mode (docs/playback.md) ------------------------------------------------------------------
+
+/// Finds a song's music video once and remembers the answer (it's a search per song).
+class MusicVideoFinder {
+  MusicVideoFinder(this._yt);
+
+  final InnerTube _yt;
+  final _found = <String, String?>{};
+
+  Future<String?> find(SongItem song) async {
+    if (_found.containsKey(song.videoId)) return _found[song.videoId];
+    try {
+      return _found[song.videoId] = await _yt.musicVideoFor(song);
+    } catch (e) {
+      debugPrint('YouPipe: music video lookup failed: $e');
+      return null;
+    }
+  }
+}
+
+final musicVideoFinderProvider = Provider<MusicVideoFinder>((ref) => MusicVideoFinder(ref.watch(innerTubeProvider)));
+
+/// The music video id for the current song, if it has one (enables the Video toggle).
+final musicVideoProvider = FutureProvider.autoDispose.family<String?, String>((ref, videoId) async {
+  final song = ref.watch(queueStateProvider).value?.songs.where((s) => s.videoId == videoId).firstOrNull;
+  return song == null ? null : ref.read(musicVideoFinderProvider).find(song);
+});
+
+/// Watched from the app root, so the handler gets its video output at startup.
+final videoOutputProvider = Provider<VideoOutput>((ref) {
+  final handler = ref.read(audioHandlerProvider);
+  final finder = ref.read(musicVideoFinderProvider);
+  final video = VideoOutput(
+    findVideo: (item) async {
+      final song = handler.queueState.value.songs.where((s) => s.videoId == item.id).firstOrNull;
+      return song == null ? null : finder.find(song);
+    },
+    resolve: ref.read(streamResolverProvider).resolveVideo,
+  );
+  handler.video = video;
+  return video;
+});
+
+final videoModeProvider = Provider<bool>((ref) {
+  final mode = ref.watch(audioHandlerProvider).videoMode;
+  void changed() => ref.invalidateSelf();
+  mode.addListener(changed);
+  ref.onDispose(() => mode.removeListener(changed));
+  return mode.value;
 });
 
 final castStatusProvider = Provider<CastStatus>((ref) {

@@ -59,6 +59,6 @@
 | `CollectionHeader`, `TintedPage`, `ArtworkTint` | Album/playlist header and page: artwork-tinted gradient, the top bar turns solid and shows the title after scrolling |
 | `LoadingView`, `ErrorView`, `EmptyView`, `songCount()` | Standard states and pluralisation |
 
-- **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video isn't implemented yet), left-aligned Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
+- **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video plays the music video in place of the artwork; it's dimmed when the song has no video or while casting; see playback.md), left-aligned Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
 - **Artist page:** `SliverAppBar` with `FlexibleSpaceBar`, where the full-bleed image collapses into a solid bar with the name.
 - **Search:** suggestions highlight the part you haven't typed yet; search history is shown when the field is empty; filter chips use the `SearchFilter` params.

@@ -39,12 +39,27 @@ class AudioStreamInfo {
   }
 }
 
+/// A muxed (video + audio) stream for video mode, with the User-Agent its client requires.
+class VideoStreamInfo {
+  const VideoStreamInfo({required this.url, required this.userAgent, this.height});
+
+  final String url;
+  final String userAgent;
+  final int? height;
+
+  DateTime? get expiresAt {
+    final s = Uri.tryParse(url)?.queryParameters['expire'];
+    final secs = s == null ? null : int.tryParse(s);
+    return secs == null ? null : DateTime.fromMillisecondsSinceEpoch(secs * 1000);
+  }
+}
+
 enum AudioQuality { low, high }
 
 class StreamResolveException implements Exception {
   StreamResolveException(this.code, this.message);
 
-  /// AGE_RESTRICTED, GEO_RESTRICTED, UNAVAILABLE, RECAPTCHA, EXTRACTION_FAILED, NO_STREAMS
+  /// AGE_RESTRICTED, GEO_RESTRICTED, UNAVAILABLE, RECAPTCHA, EXTRACTION_FAILED, NO_STREAMS, NO_VIDEO
   final String code;
   final String message;
 
@@ -106,5 +121,35 @@ class StreamResolver {
     return quality == AudioQuality.high ? pool.last : pool.first;
   }
 
-  void invalidate(String videoId) => _cache.remove(videoId);
+  void invalidate(String videoId) {
+    _cache.remove(videoId);
+    _videoCache.remove(videoId);
+  }
+
+  final _videoCache = <String, VideoStreamInfo>{};
+
+  /// Video mode: the muxed stream of a (music) video, at most 720p; in practice YouTube muxes 360p.
+  Future<VideoStreamInfo> resolveVideo(String videoId) async {
+    final cached = _videoCache[videoId];
+    final expiry = cached?.expiresAt;
+    if (cached != null && expiry != null && expiry.isAfter(DateTime.now().add(const Duration(minutes: 10)))) {
+      return cached;
+    }
+    try {
+      final r = await _channel.invokeMapMethod<Object?, Object?>('getVideoStream', {
+        'videoId': videoId,
+        'hl': hl,
+        'gl': gl,
+      });
+      final info = VideoStreamInfo(
+        url: r!['url'] as String,
+        userAgent: r['userAgent'] as String,
+        height: r['height'] as int?,
+      );
+      _videoCache[videoId] = info;
+      return info;
+    } on PlatformException catch (e) {
+      throw StreamResolveException(e.code, e.message ?? 'Video extraction failed');
+    }
+  }
 }

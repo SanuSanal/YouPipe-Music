@@ -19,6 +19,8 @@
   - **Refresh:** `invalidate()` or `forceRefresh` fetch a new URL.
 - The player fetches a new URL once when a stream errors mid-song (see playback.md).
 
+- **Video mode:** `getVideoStream({videoId, hl, gl})` returns the best **muxed** progressive stream (video and audio in one file, at most 720p; YouTube only muxes **360p**, itag 18), plus the `userAgent` its client needs: `{url, height, mimeType, userAgent, durationSeconds}`, or `NO_VIDEO`. `StreamResolver.resolveVideo` caches it like audio. The `video_player` controller sends that User-Agent as a header.
+
 ## Stream URLs are bound to the client
 
 - A googlevideo URL carries `ip=` (the phone's address, often **IPv6 on mobile data**) and `c=` (the InnerTube client, e.g. `VISIONOS`).

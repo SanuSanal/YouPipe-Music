@@ -11,6 +11,7 @@ import '../data/stream_resolver.dart';
 import '../innertube/models.dart';
 import 'auto_browser.dart';
 import 'cast.dart';
+import 'video_output.dart';
 
 enum QueueRepeatMode { off, all, one }
 
@@ -71,9 +72,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       if (s == ProcessingState.completed) _onCompleted();
     });
     _player.positionStream.listen((p) {
-      if (!casting) _skipSegments(p);
+      if (_output == null) _skipSegments(p);
     });
-    _castPositions.stream.listen(_skipSegments);
+    _remotePositions.stream.listen(_skipSegments);
     _initSession();
   }
 
@@ -97,16 +98,28 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Emits when a non-music section was skipped (for a toast).
   final skippedSegments = StreamController<SkipSegment>.broadcast();
 
-  // Chromecast (docs/cast.md): while a session is connected, songs play on the receiver instead.
+  // Outputs other than the phone's audio player: a Cast device while casting (docs/cast.md), else
+  // the on-screen video player in video mode (docs/playback.md). They share one routing: while one
+  // is active, songs load on it and transport, position and completion follow it.
   RemotePlayback? _cast;
+  VideoOutput? _video;
   StreamSubscription<RemotePlayer>? _castPlayer;
-  bool _wasCasting = false;
+  StreamSubscription<RemotePlayer>? _videoPlayer;
 
-  /// The proxy URL of the song loaded on the receiver; its status updates carry it.
-  String? _castUrl;
+  /// Where songs play now; null is the phone's own audio player.
+  RemotePlayback? _output;
+
+  /// Video mode (the full player's Song/Video toggle). Casting turns it off.
+  final videoMode = ValueNotifier(false);
+
+  /// Emits a song that has no music video, when video mode had to fall back to the song.
+  final noVideo = StreamController<SongItem>.broadcast();
+
+  /// The output's key for the loaded song; its status updates carry it.
+  String? _remoteUrl;
   RemotePlayer? _remote;
-  Duration _castPosition = Duration.zero;
-  final _castPositions = StreamController<Duration>.broadcast();
+  Duration _remotePosition = Duration.zero;
+  final _remotePositions = StreamController<Duration>.broadcast();
   static const _castVolumeSteps = 20;
 
   /// Set by the app once the Cast channel exists.
@@ -119,7 +132,23 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     _onCastStatus();
   }
 
+  /// Set by the app: the player behind video mode.
+  set video(VideoOutput? video) {
+    unawaited(_videoPlayer?.cancel());
+    _video = video;
+    _videoPlayer = video?.player.listen(_onRemotePlayer);
+  }
+
+  /// Turns video mode on or off; the song continues from the same position.
+  void setVideoMode(bool on) {
+    if (videoMode.value == on || (on && (casting || _video == null))) return;
+    videoMode.value = on;
+    _syncOutput();
+  }
+
   bool get casting => _cast?.status.value.connected ?? false;
+
+  bool get _remoteActive => _output != null;
 
   /// The lock screen player's Like button (`customAction('toggleLike')`); set by the app.
   Future<void> Function()? onToggleLike;
@@ -140,12 +169,12 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   int _loadGeneration = 0;
   bool _retriedCurrent = false;
 
-  /// Follows the receiver while casting; `positionProvider` re-subscribes when that changes.
-  Stream<Duration> get positionStream => casting ? _castPositions.stream : _player.positionStream;
+  /// Follows the active output; `positionProvider` re-subscribes when that changes.
+  Stream<Duration> get positionStream => _remoteActive ? _remotePositions.stream : _player.positionStream;
   Stream<Duration> get bufferedPositionStream => _player.bufferedPositionStream;
-  Duration get position => casting ? _castPosition : _player.position;
-  Duration? get duration => casting ? (_remote?.duration ?? mediaItem.value?.duration) : _player.duration;
-  bool get _isPlaying => casting ? (_remote?.playing ?? false) : _player.playing;
+  Duration get position => _remoteActive ? _remotePosition : _player.position;
+  Duration? get duration => _remoteActive ? (_remote?.duration ?? mediaItem.value?.duration) : _player.duration;
+  bool get _isPlaying => _remoteActive ? (_remote?.playing ?? false) : _player.playing;
 
   Future<void> _initSession() async {
     final session = await AudioSession.instance;
@@ -301,17 +330,39 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
           }, onError: (_) {}),
         );
       }
-      if (casting) {
-        _castUrl = null;
+      if (_remoteActive) {
+        _remoteUrl = null;
         _remote = null;
-        _castPosition = position ?? Duration.zero;
-        final url = await _cast!.load(
-          item: _nowPlaying(song),
-          localPath: local,
-          position: position ?? Duration.zero,
-          autoplay: autoplay,
-        );
-        if (gen == _loadGeneration) _castUrl = url;
+        _remotePosition = position ?? Duration.zero;
+        final output = _output!;
+        final String? url;
+        try {
+          url = await output.load(
+            item: _nowPlaying(song),
+            localPath: local,
+            position: position ?? Duration.zero,
+            autoplay: autoplay,
+          );
+        } on NoVideoException {
+          if (gen != _loadGeneration || !identical(output, _video)) return;
+          // No music video for this song: carry on with the song itself.
+          noVideo.add(song);
+          videoMode.value = false;
+          _output = null;
+          unawaited(_video?.release());
+          await _loadIndex(index, position: position, autoplay: autoplay);
+          return;
+        }
+        if (gen != _loadGeneration) return;
+        _remoteUrl = url;
+        final videoId = _video?.currentVideoId;
+        if (identical(output, _video) && loader != null && videoId != null && videoId != song.videoId) {
+          unawaited(
+            loader(videoId).then((segs) {
+              if (gen == _loadGeneration) _segments = segs;
+            }, onError: (_) {}),
+          );
+        }
         return;
       }
       final AudioSource source;
@@ -392,7 +443,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     }
     final s = queueState.value;
     if (s.repeat == QueueRepeatMode.one) {
-      if (casting) {
+      if (_remoteActive) {
         _loadIndex(s.index);
       } else {
         _player.seek(Duration.zero);
@@ -402,7 +453,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       _loadIndex(s.index + 1);
     } else if (s.repeat == QueueRepeatMode.all && s.songs.isNotEmpty) {
       _loadIndex(0);
-    } else if (!casting) {
+    } else if (!_remoteActive) {
       _player.pause();
       _player.seek(Duration.zero);
     }
@@ -411,7 +462,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// A 403 mid-song usually means the URL expired or got revoked: re-resolve once and resume.
   void _onPlayerError(Object error, StackTrace st) {
     debugPrint('YouPipe: player error $error');
-    if (casting) return;
+    if (_remoteActive) return;
     final s = queueState.value;
     if (s.current == null || _retriedCurrent) return;
     _retriedCurrent = true;
@@ -421,7 +472,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _broadcastState(PlaybackEvent? _) {
     final playing = _isPlaying;
-    final remote = casting ? _remote : null;
+    final remote = _remoteActive ? _remote : null;
     final s = queueState.value;
     playbackState.add(
       playbackState.value.copyWith(
@@ -432,7 +483,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         ],
         systemActions: const {MediaAction.seek, MediaAction.seekForward, MediaAction.seekBackward},
         androidCompactActionIndices: const [0, 1, 2],
-        processingState: casting
+        processingState: _remoteActive
             ? (remote?.processingState ?? playbackState.value.processingState)
             : playbackState.value.processingState == AudioProcessingState.error &&
                   _player.processingState == ProcessingState.idle
@@ -446,7 +497,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
               }[_player.processingState]!,
         playing: playing,
         updatePosition: position,
-        bufferedPosition: casting ? _castPosition : _player.bufferedPosition,
+        bufferedPosition: _remoteActive ? _remotePosition : _player.bufferedPosition,
         speed: _player.speed,
         queueIndex: s.index,
         shuffleMode: s.shuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
@@ -463,8 +514,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _onCastStatus() {
     final status = _cast?.status.value ?? const CastStatus();
-    final now = status.connected;
-    if (now && status.volumeControl) {
+    if (status.connected && status.volumeControl) {
       // Volume keys and the system volume panel control the receiver.
       androidPlaybackInfo.add(
         RemoteAndroidPlaybackInfo(
@@ -473,34 +523,43 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
           volume: (status.volume * _castVolumeSteps).round(),
         ),
       );
-    }
-    if (now && !status.volumeControl) androidPlaybackInfo.add(LocalAndroidPlaybackInfo());
-    if (now == _wasCasting) return;
-    _wasCasting = now;
-    final s = queueState.value;
-    if (now) {
-      // Hand the song over to the receiver, from where the phone was.
-      final position = _player.position;
-      final wasPlaying = _player.playing;
-      unawaited(_player.pause());
-      if (s.current != null) unawaited(_loadIndex(s.index, position: position, autoplay: wasPlaying));
-    } else {
+    } else if (androidPlaybackInfo.valueOrNull is! LocalAndroidPlaybackInfo) {
       androidPlaybackInfo.add(LocalAndroidPlaybackInfo());
-      final position = _castPosition;
-      _castUrl = null;
-      _remote = null;
-      // Back on the phone, paused where the receiver was (as YouTube Music does).
-      if (s.current != null) unawaited(_loadIndex(s.index, position: position, autoplay: false));
     }
+    if (status.connected) videoMode.value = false;
+    _syncOutput();
+  }
+
+  /// Moves playback to the output that should be active now: the Cast device while casting, else
+  /// the video player in video mode, else the phone. The song carries on from the same position.
+  void _syncOutput() {
+    final target = casting ? _cast : (videoMode.value ? _video : null);
+    if (identical(target, _output)) return;
+    final previous = _output;
+    final position = this.position;
+    final wasPlaying = _isPlaying;
+    if (previous == null) {
+      unawaited(_player.pause());
+    } else {
+      unawaited(previous.pause());
+      if (identical(previous, _video)) unawaited(_video!.release());
+    }
+    _output = target;
+    _remoteUrl = null;
+    _remote = null;
+    // When casting ends, stay paused on the phone (as YouTube Music does); other switches keep playing.
+    final autoplay = wasPlaying && !(identical(previous, _cast) && target == null);
+    final s = queueState.value;
+    if (s.current != null) unawaited(_loadIndex(s.index, position: position, autoplay: autoplay));
     _broadcastState(null);
   }
 
   void _onRemotePlayer(RemotePlayer p) {
-    if (!casting || p.url == null || p.url != _castUrl) return;
+    if (_output == null || p.url == null || p.url != _remoteUrl) return;
     final wasFinished = _remote?.finished ?? false;
     _remote = p;
-    _castPosition = p.position;
-    _castPositions.add(p.position);
+    _remotePosition = p.position;
+    _remotePositions.add(p.position);
     final item = mediaItem.value;
     if (item != null && item.duration == null && p.duration != null) mediaItem.add(item.copyWith(duration: p.duration));
     _broadcastState(null);
@@ -545,13 +604,13 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> play() async {
-    if (casting) {
+    if (_remoteActive) {
       final remote = _remote;
       // Nothing playable on the receiver (finished, failed or not loaded yet): load the song again.
       if (remote == null || remote.state == RemoteState.idle) {
-        return _loadIndex(queueState.value.index, position: remote?.finished == true ? Duration.zero : _castPosition);
+        return _loadIndex(queueState.value.index, position: remote?.finished == true ? Duration.zero : _remotePosition);
       }
-      return _cast!.play();
+      return _output!.play();
     }
     if (playbackState.value.processingState == AudioProcessingState.error) {
       return _loadIndex(queueState.value.index, position: _player.position, forceRefresh: true);
@@ -560,14 +619,14 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<void> pause() => casting ? _cast!.pause() : _player.pause();
+  Future<void> pause() => _remoteActive ? _output!.pause() : _player.pause();
 
   @override
   Future<void> seek(Duration position) {
-    if (!casting) return _player.seek(position);
-    _castPosition = position;
-    _castPositions.add(position);
-    return _cast!.seek(position);
+    if (!_remoteActive) return _player.seek(position);
+    _remotePosition = position;
+    _remotePositions.add(position);
+    return _output!.seek(position);
   }
 
   @override
@@ -621,7 +680,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> _fadeOutAndPause() async {
-    if (casting) {
+    if (_remoteActive) {
       await pause();
       cancelSleepTimer();
       return;
@@ -656,7 +715,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> stop() async {
-    if (casting) await _cast?.pause();
+    if (_remoteActive) await _output?.pause();
     await _player.stop();
     await super.stop();
   }
