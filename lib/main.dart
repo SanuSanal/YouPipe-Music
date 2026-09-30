@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/db/app_database.dart';
+import 'data/error_log.dart';
 import 'data/stream_resolver.dart';
 import 'innertube/innertube.dart';
 import 'player/audio_handler.dart';
@@ -15,6 +16,16 @@ import 'ui/theme/ytm_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Uncaught errors also go to the hidden Error log page (Settings → About: tap the version 3 times).
+  final flutterOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    errorLog.add('flutter', details.exceptionAsString(), stack: details.stack);
+    flutterOnError?.call(details);
+  };
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    errorLog.add('uncaught', error, stack: stack);
+    return false;
+  };
 
   final prefs = await SharedPreferences.getInstance();
   final innerTube = InnerTube(visitorData: prefs.getString('visitorData'));

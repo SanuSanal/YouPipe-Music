@@ -140,6 +140,13 @@ class StreamResolver {
     };
   }
 
+  /// Drops every cached URL: after a network change they're bound to an old IP address.
+  void clearCache() {
+    _cache.clear();
+    _videoCache.clear();
+    _manifestCache.clear();
+  }
+
   void invalidate(String videoId) {
     _cache.remove(videoId);
     _videoCache.remove(videoId);

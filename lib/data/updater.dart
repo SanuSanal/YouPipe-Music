@@ -12,16 +12,20 @@ const releasesPageUrl = 'https://github.com/$releasesRepo/releases/latest';
 
 /// The installed app, as reported by the platform.
 class AppInfo {
-  const AppInfo({required this.versionName, required this.versionCode, required this.abis});
+  const AppInfo({required this.versionName, required this.versionCode, required this.abis, this.device});
 
   factory AppInfo.fromMap(Map<Object?, Object?> m) => AppInfo(
     versionName: m['versionName'] as String? ?? '0.0.0',
     versionCode: m['versionCode'] as int? ?? 0,
     abis: [for (final a in m['abis'] as List<Object?>? ?? const []) a as String],
+    device: m['device'] as String?,
   );
 
   final String versionName;
   final int versionCode;
+
+  /// "Manufacturer Model, Android x (SDK n)", for bug reports.
+  final String? device;
 
   /// Supported ABIs, most preferred first (Build.SUPPORTED_ABIS).
   final List<String> abis;

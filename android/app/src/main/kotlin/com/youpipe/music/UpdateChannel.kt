@@ -52,6 +52,8 @@ class UpdateChannel(
             "versionName" to info.versionName,
             "versionCode" to versionCode,
             "abis" to Build.SUPPORTED_ABIS.toList(),
+            // For bug reports from the Error log page.
+            "device" to "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
         )
     }
 

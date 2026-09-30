@@ -12,12 +12,22 @@
 - **Preloading the next song (gapless):** on the phone's own player, just_audio's playlist is `[current, upcoming]`. ExoPlayer buffers the upcoming song before the current one ends and moves on with no gap.
   - `_upcomingIndex()` is the next queue index, or `0` with repeat-all at the end. It's null with repeat-one, with sleep-at-end-of-song, or at the end of the queue; then nothing is preloaded and `_onCompleted` handles the end as before.
   - `_syncPreloaded()` rebuilds the second slot. It runs after every queue edit, shuffle, repeat or sleep-at-end change. The work is serialized on `_preloadOp` and guarded by `_loadGeneration`.
+  - When preloading fails (for example with no signal), it's logged and tried again every 20 s for as long as the same song plays.
   - `_onPlayerIndex` (on `currentIndexStream`) handles the automatic move: it publishes the new queue index, media item and SponsorBlock segments, then preloads the one after.
   - Skipping to the preloaded song (Next, SponsorBlock ending a song, tapping it in Up next) uses `seekToNext()` in place of a reload.
   - Cast and video mode don't preload; their `_loadIndex` path is unchanged.
 - **Stale-load guard:** `_loadGeneration` makes sure a slow load can't override a newer choice.
-- **Error recovery:** a player error fetches a new URL once and resumes at the same position (`_retriedCurrent`). Pressing play in the error state retries.
-- **Completion:** repeat-one replays; otherwise the next song plays; with repeat-all at the end it wraps; otherwise it stops at 0.
+- **Error recovery (tested 2026-09-30 by turning Wi-Fi off and on while playing):**
+  - **Where errors arrive:** just_audio 0.10 reports player errors on `errorStream`, not as errors on `playbackEventStream`. The old `onError` hook never fired, so nothing recovered.
+  - **Retrying:** a player error, or a failed load that can be retried, calls `_recover`. It clears **every** cached stream URL (they're bound to the phone's IP, which usually changes after a loss of signal), then reloads the song with a fresh URL from `_lastPosition`. The first retry is immediate, then after 2, 5, 10, 20 and 30 s (`_retryDelays`, about 3.5 minutes in all). After that it shows the error state ("Can't play this song").
+  - **While retrying,** the session reports `buffering` and playing, so the car and notification don't look stopped. Pause cancels the retries; Play (also from the error or idle state) retries at once.
+  - **Not retried:** `AGE_RESTRICTED`, `GEO_RESTRICTED`, `UNAVAILABLE` and `NO_STREAMS` go straight to the error state.
+  - **The retry count** resets after 20 s of playback past the recovery point.
+  - **No double counting:** `_settingSource` and the pending retry timer stop one failure being handled twice (by `_loadIndex`'s catch and by `errorStream`).
+  - **A preloaded next song that fails** as the player reaches it is recovered as that song, from 0:00.
+- **Buffer:** `AndroidLoadControl` buffers 3–5 minutes ahead instead of ExoPlayer's 50 s. That's a few MB at 160 kbps, and short losses of signal pass unnoticed. In the test, 40 s without Wi-Fi played through, including the move into the preloaded next song.
+- **Completion:** repeat-one replays; otherwise the next song plays; with repeat-all at the end it wraps; otherwise it stops at 0. When the next song wasn't preloaded (for example because preloading failed), it's loaded with a fresh URL (`_loadNext`).
+- **Error log:** failures (player, load, preload, radio, video, download, cast, uncaught) go to the in-memory `errorLog` (`lib/data/error_log.dart`, last 200 entries), which the hidden Error log page shows (see ui.md).
 - **Shuffle works like YouTube Music:** turning it on *reorders the upcoming songs in the visible queue*. It isn't a hidden shuffle order. Turning it off doesn't restore the old order.
 - **Queue edits:** `playNext`, `addToQueue`, `removeFromQueue` (the current song can't be removed) and `moveInQueue` (keeps `index` pointing at the current song; the arguments use `ReorderableListView.onReorderItem` semantics).
 - **Our enum is `QueueRepeatMode`,** not `RepeatMode`, which now clashes with a Flutter widgets type.
