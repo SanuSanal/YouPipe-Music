@@ -81,9 +81,13 @@ ThemeData buildYtmTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
     ),
     snackBarTheme: const SnackBarThemeData(
-      backgroundColor: Color(0xFFE8E8E8),
-      contentTextStyle: TextStyle(color: Colors.black, fontSize: 14),
+      backgroundColor: YtmColors.elevated,
+      contentTextStyle: TextStyle(color: YtmColors.textPrimary, fontSize: 14),
+      actionTextColor: YtmColors.textPrimary,
       behavior: SnackBarBehavior.floating,
+      elevation: 0,
+      insetPadding: EdgeInsets.symmetric(horizontal: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
     ),
     sliderTheme: const SliderThemeData(
       activeTrackColor: YtmColors.textPrimary,
