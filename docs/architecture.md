@@ -13,6 +13,7 @@ InnerTube client (lib/innertube/, pure Dart)    YouPipeAudioHandler (lib/player/
         │                                     youpipe/stream_extractor → NewPipeExtractor
         │                                     youpipe/downloader(+/progress) → OkHttp
         │                                     youpipe/cookies → WebView CookieManager
+        │                                     youpipe/effects → Equalizer, LoudnessEnhancer
         ▼
 Local data: drift SQLite (lib/data/db), SharedPreferences (settings), flutter_secure_storage (session cookie)
 ```
@@ -25,10 +26,10 @@ Local data: drift SQLite (lib/data/db), SharedPreferences (settings), flutter_se
 | `lib/providers.dart` | Core service providers, settings, audio effects, player actions, data providers (paged controllers) |
 | `lib/innertube/` | InnerTube client, models, parsers (no Flutter imports, so tests run in plain Dart) |
 | `lib/data/` | Stream resolver, downloads, lyrics (LRCLIB), SponsorBlock, drift DB, library repository, account/auth |
-| `lib/player/` | `audio_handler.dart` (queue, playback, effects, timers); `auto_browser.dart` (Android Auto tree) |
+| `lib/player/` | `audio_handler.dart` (queue, playback, timers); `audio_effects.dart` (equalizer and loudness); `auto_browser.dart` (Android Auto tree) |
 | `lib/ui/` | Theme tokens, router, app shell (bottom nav + player panel), shared widgets, navigation helpers |
 | `lib/features/<screen>/` | One folder per screen |
-| `android/app/src/main/kotlin/com/youpipe/music/` | Native channels: stream extraction, downloader, cookies, updater, casting (Chromecast, and the LAN relay shared with DLNA); the lock screen player activity |
+| `android/app/src/main/kotlin/com/youpipe/music/` | Native channels: stream extraction, downloader, cookies, audio effects, updater, casting (Chromecast, and the LAN relay shared with DLNA); the lock screen player activity |
 | `tool/` | Fixture recording and renderer-tree inspection scripts (Python) |
 
 ## Wiring and startup

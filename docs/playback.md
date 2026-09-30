@@ -51,7 +51,9 @@
 - **Sleep timer:** `setSleepTimer(duration)` fades out over about 5 s and then pauses. `sleepAtEndOfSong()` pauses on completion instead of advancing. State is in `sleepTimer` (`sleepTimerProvider`).
 - **Speed:** `setSpeed` (overrides BaseAudioHandler) with `speedProvider`.
 - **Equalizer and loudness:**
-  - Uses `AndroidEqualizer` and `AndroidLoudnessEnhancer` in the player's `AudioPipeline`. Band parameters only exist once the player is active, so gains are applied from `equalizer.parameters`.
+  - **Attached natively, best-effort:** `AudioEffectsChannel.kt` (`youpipe/effects`) creates an `Equalizer` and a `LoudnessEnhancer` on just_audio's audio session. `handler.effects` (`lib/player/audio_effects.dart`) attaches them whenever `androidAudioSessionIdStream` changes; each `stop()` rebuilds the native player with a new session. Each effect is in its own try/catch. When the system refuses one, it's logged (`[effects]`), the sheet says the equalizer isn't available, and the song still plays.
+  - **Why not just_audio's `AudioPipeline`** (changed 2026-09-30): when `new Equalizer()` failed inside just_audio's player setup, the native player was left without its equalizer. Every `load()` then failed with an NPE on `getNumberOfBands()`, so the song never played; the retries ran out and it showed "Can't play this song". Don't move the effects back into the pipeline.
+  - The native side keeps the wanted settings (enabled, gains in dB by band index, loudness dB) and applies them on every attach. The sheet gets the bands (`EqInfo`: min/max dB, center Hz) from `effects.status`.
   - `AudioEffectsController` persists `eqEnabled`, `eqGains`, `loudnessDb` and `eqPreset`, and restores them at startup.
   - Presets are **gain curves over frequency** (`eqPresets`), so they fit any device's band layout.
 - **History:** the app shell records each new current song in the local history when `saveHistory` is on.
@@ -93,5 +95,6 @@
   - Browsable: `folder:home|liked|downloads|playlists|history`, `home:<n>`, `playlist:<id>`, `album:<id>`, `local:<id>`.
   - Playable: `<parentId>|<index>` plays the whole list from that index; `song:<videoId>` (search results) starts a radio.
 - Manifest: `com.google.android.gms.car.application` → `res/xml/automotive_app_desc.xml`.
+- **Volume:** the phone's volume keys don't change the car's volume. Android Auto sends media to the head unit at a fixed level and the car's own volume control sets the loudness (YTM and Spotify behave the same). The app only takes over the volume keys while casting.
 - Covered by `test/auto_browser_test.dart`. Tested on a real car on 2026-09-30: playback, and the app in the car's launcher.
 - **Sideloaded builds are hidden from the car's launcher.** Android Auto only lists apps installed from the Play Store until the user turns on **Unknown sources**: open Android Auto's settings, tap **Version** about 10 times, then go to ⋮ → **Developer settings** → **Unknown sources**. The app may also need adding with **Customize launcher**. Without this, playback still shows in the car, because Android Auto displays any active media session as "now playing". The app can't change this, so the step is in the README and the website FAQ.

@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
 
+import '../../player/audio_effects.dart';
 import '../../providers.dart';
 import '../../ui/theme/ytm_theme.dart';
 import '../../ui/widgets/item_menu.dart' show showSnack;
@@ -172,10 +172,11 @@ class _EqualizerSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: FutureBuilder<AndroidEqualizerParameters>(
-        future: ref.read(audioHandlerProvider).equalizer.parameters,
-        builder: (context, snap) {
-          final params = snap.data;
+      child: ValueListenableBuilder<EffectsStatus>(
+        valueListenable: ref.read(audioHandlerProvider).effects.status,
+        builder: (context, status, _) {
+          final eq = status is EffectsReady ? status.eq : null;
+          double gainOf(int i) => (i < fx.gains.length ? fx.gains[i] : 0.0).clamp(eq!.minDb, eq.maxDb).toDouble();
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,10 +187,14 @@ class _EqualizerSheet extends ConsumerWidget {
                   Switch(value: fx.eqEnabled, activeTrackColor: YtmColors.brandRed, onChanged: controller.setEnabled),
                 ],
               ),
-              if (params == null)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Start playing a song to adjust the equalizer.'),
+              if (eq == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    status is EffectsUnavailable
+                        ? "The equalizer isn't available on this device right now."
+                        : 'Start playing a song to adjust the equalizer.',
+                  ),
                 )
               else ...[
                 SizedBox(
@@ -214,8 +219,7 @@ class _EqualizerSheet extends ConsumerWidget {
                             onSelected: (_) {
                               final curve = eqPresets[name]!;
                               final gains = [
-                                for (final b in params.bands)
-                                  curve(b.centerFrequency).clamp(params.minDecibels, params.maxDecibels).toDouble(),
+                                for (final hz in eq.bandHz) curve(hz).clamp(eq.minDb, eq.maxDb).toDouble(),
                               ];
                               if (!fx.eqEnabled) controller.setEnabled(true);
                               controller.setGains(gains, preset: name);
@@ -230,38 +234,32 @@ class _EqualizerSheet extends ConsumerWidget {
                   height: 220,
                   child: Row(
                     children: [
-                      for (final band in params.bands)
+                      for (var i = 0; i < eq.bandHz.length; i++)
                         Expanded(
-                          child: StreamBuilder<double>(
-                            stream: band.gainStream,
-                            builder: (context, gainSnap) {
-                              final gain = gainSnap.data ?? band.gain;
-                              return Column(
-                                children: [
-                                  Text(
-                                    '${gain >= 0 ? '+' : ''}${gain.toStringAsFixed(0)}',
-                                    style: theme.textTheme.bodySmall,
+                          child: Column(
+                            children: [
+                              Text(
+                                '${gainOf(i) >= 0 ? '+' : ''}${gainOf(i).toStringAsFixed(0)}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Expanded(
+                                child: RotatedBox(
+                                  quarterTurns: 3,
+                                  child: Slider(
+                                    value: gainOf(i),
+                                    min: eq.minDb,
+                                    max: eq.maxDb,
+                                    activeColor: fx.eqEnabled ? YtmColors.brandRed : YtmColors.textSecondary,
+                                    onChanged: (v) => controller.setBandGain(i, v, bands: eq.bandHz.length),
+                                    onChangeEnd: (_) {
+                                      if (!fx.eqEnabled) controller.setEnabled(true);
+                                      controller.setGains(ref.read(audioEffectsProvider).gains);
+                                    },
                                   ),
-                                  Expanded(
-                                    child: RotatedBox(
-                                      quarterTurns: 3,
-                                      child: Slider(
-                                        value: gain.clamp(params.minDecibels, params.maxDecibels),
-                                        min: params.minDecibels,
-                                        max: params.maxDecibels,
-                                        activeColor: fx.eqEnabled ? YtmColors.brandRed : YtmColors.textSecondary,
-                                        onChanged: (v) => band.setGain(v),
-                                        onChangeEnd: (_) {
-                                          if (!fx.eqEnabled) controller.setEnabled(true);
-                                          controller.setGains([for (final b in params.bands) b.gain]);
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                  Text(_hz(band.centerFrequency), style: theme.textTheme.bodySmall),
-                                ],
-                              );
-                            },
+                                ),
+                              ),
+                              Text(_hz(eq.bandHz[i]), style: theme.textTheme.bodySmall),
+                            ],
                           ),
                         ),
                     ],

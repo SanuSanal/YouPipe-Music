@@ -361,25 +361,28 @@ class AudioEffectsController extends Notifier<AudioEffectsState> {
       loudnessDb: state.loudnessDb,
       preset: state.preset,
     );
-    await ref.read(audioHandlerProvider).equalizer.setEnabled(enabled);
+    await ref.read(audioHandlerProvider).effects.setEqEnabled(enabled);
     await _prefs.setBool('eqEnabled', enabled);
   }
 
+  /// Sets and saves the band gains (dB, by band index).
   Future<void> setGains(List<double> gains, {String preset = 'Custom'}) async {
     state = AudioEffectsState(eqEnabled: state.eqEnabled, gains: gains, loudnessDb: state.loudnessDb, preset: preset);
-    final params = await ref.read(audioHandlerProvider).equalizer.parameters;
-    for (final band in params.bands) {
-      if (band.index < gains.length) await band.setGain(gains[band.index]);
-    }
+    await ref.read(audioHandlerProvider).effects.setGains(gains);
     await _prefs.setStringList('eqGains', gains.map((g) => g.toStringAsFixed(2)).toList());
     await _prefs.setString('eqPreset', preset);
   }
 
+  /// Changes one band while its slider is dragged; [setGains] saves when the drag ends.
+  Future<void> setBandGain(int band, double db, {required int bands}) async {
+    final gains = [for (var i = 0; i < bands; i++) i == band ? db : (i < state.gains.length ? state.gains[i] : 0.0)];
+    state = AudioEffectsState(eqEnabled: state.eqEnabled, gains: gains, loudnessDb: state.loudnessDb, preset: 'Custom');
+    await ref.read(audioHandlerProvider).effects.setGains(gains);
+  }
+
   Future<void> setLoudness(double db) async {
     state = AudioEffectsState(eqEnabled: state.eqEnabled, gains: state.gains, loudnessDb: db, preset: state.preset);
-    final loudness = ref.read(audioHandlerProvider).loudness;
-    await loudness.setEnabled(db > 0);
-    await loudness.setTargetGain(db);
+    await ref.read(audioHandlerProvider).effects.setLoudness(db);
     await _prefs.setDouble('loudnessDb', db);
   }
 }
