@@ -23,12 +23,30 @@ A free, ad-free YouTube Music client for Android, with background playback, offl
 
 ---
 
+## 📸 Screenshots
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/screenshots/home.webp" width="240" alt="Home: Quick picks and moods" /><br/><sub><b>Home</b></sub></td>
+    <td align="center"><img src="assets/screenshots/player.webp" width="240" alt="Now playing, tinted from the artwork" /><br/><sub><b>Now playing</b></sub></td>
+    <td align="center"><img src="assets/screenshots/lockscreen.webp" width="240" alt="Full-screen lock screen player" /><br/><sub><b>Lock screen player</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/explore.webp" width="240" alt="Explore: new releases, charts, moods" /><br/><sub><b>Explore</b></sub></td>
+    <td align="center"><img src="assets/screenshots/album.webp" width="240" alt="Album page" /><br/><sub><b>Albums</b></sub></td>
+    <td align="center"><img src="assets/screenshots/upnext.webp" width="240" alt="Up next queue with endless radio" /><br/><sub><b>Up next</b></sub></td>
+  </tr>
+</table>
+
+---
+
 ## ✨ Features
 
 **Listen**
 - Everything from YouTube Music: songs, albums, artists, playlists, charts, moods and new releases
 - **No ads**, ever
 - Background playback with notification and lock-screen controls
+- An optional full-screen **lock screen player**: the album art fills the screen, with a clock and big controls
 - Endless radio and "Up next" from any song
 - Shuffle, repeat and queue editing
 
@@ -62,17 +80,6 @@ Grab the latest APK from the **[Releases page](https://github.com/SanuSanal/YouP
 
 > [!NOTE]
 > YouPipe Music isn't on the Play Store. Android may ask you to allow installs from your browser or file manager the first time.
-
-<!--
-## 📸 Screenshots
-
-<p align="center">
-  <img src="assets/screenshots/home.png" width="200" />
-  <img src="assets/screenshots/player.png" width="200" />
-  <img src="assets/screenshots/lyrics.png" width="200" />
-  <img src="assets/screenshots/library.png" width="200" />
-</p>
--->
 
 ---
 
