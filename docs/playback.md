@@ -26,6 +26,7 @@
   - **No double counting:** `_settingSource` and the pending retry timer stop one failure being handled twice (by `_loadIndex`'s catch and by `errorStream`).
   - **A preloaded next song that fails** as the player reaches it is recovered as that song, from 0:00.
 - **Buffer:** `AndroidLoadControl` buffers 3–5 minutes ahead instead of ExoPlayer's 50 s. That's a few MB at 160 kbps, and short losses of signal pass unnoticed. In the test, 40 s without Wi-Fi played through, including the move into the preloaded next song.
+- **Swiping the app away** from recent apps stops playback, the notification and the service (`onTaskRemoved` → `stop()`). audio_service's default does nothing, so before this the music kept playing with the app gone. Reopening the app and pressing play starts the song again.
 - **Completion:** repeat-one replays; otherwise the next song plays; with repeat-all at the end it wraps; otherwise it stops at 0. When the next song wasn't preloaded (for example because preloading failed), it's loaded with a fresh URL (`_loadNext`).
 - **Error log:** failures (player, load, preload, radio, video, download, cast, uncaught) go to the in-memory `errorLog` (`lib/data/error_log.dart`, last 200 entries), which the hidden Error log page shows (see ui.md).
 - **Shuffle works like YouTube Music:** turning it on *reorders the upcoming songs in the visible queue*. It isn't a hidden shuffle order. Turning it off doesn't restore the old order.
