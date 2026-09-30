@@ -43,7 +43,7 @@
   2. The expanded player collapses (`BackButtonListener`).
   3. Pages pop.
   4. Leaving a non-Home tab goes to Home, then the app exits.
-- **Toasts:** always use `showSnack` (`item_menu.dart`). Inside the shell it sets the toast's bottom margin so it floats above the mini player and nav bar (only above the system bar when the player is expanded). The shell also shows SponsorBlock skip toasts.
+- **Toasts:** always use `showSnack` (`item_menu.dart`). Inside the shell it sets the toast's bottom margin so it floats above the mini player and nav bar (only above the system bar when the player is expanded). The shell shows "No video for this song" when video mode falls back; SponsorBlock skips are silent.
 
 ## Shared widgets (`lib/ui/widgets/`)
 

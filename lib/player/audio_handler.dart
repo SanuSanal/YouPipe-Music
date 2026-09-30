@@ -95,9 +95,6 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   SegmentLoader? segmentLoader;
   List<SkipSegment> _segments = const [];
 
-  /// Emits when a non-music section was skipped (for a toast).
-  final skippedSegments = StreamController<SkipSegment>.broadcast();
-
   // Outputs other than the phone's audio player: a Cast device while casting (docs/cast.md), else
   // the on-screen video player in video mode (docs/playback.md). They share one routing: while one
   // is active, songs load on it and transport, position and completion follow it.
@@ -394,7 +391,6 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     if (_segments.isEmpty || !_isPlaying) return;
     for (final seg in _segments) {
       if (!seg.contains(position)) continue;
-      skippedSegments.add(seg);
       final duration = this.duration;
       // A segment running to the end means the song is over.
       if (duration != null && seg.end >= duration - const Duration(seconds: 1)) {

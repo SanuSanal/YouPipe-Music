@@ -30,7 +30,7 @@
 - **SponsorBlock:**
   - When the `skipNonMusic` setting is on, `segmentLoader` fetches the `music_offtopic` segments (`lib/data/sponsorblock.dart`). It uses the privacy-preserving hash-prefix endpoint, sending only the first 4 hex chars of sha256(videoId).
   - The position stream seeks past a segment; a segment that reaches the end counts as song completion.
-  - Each skip is emitted on `skippedSegments`, which the shell shows as a toast.
+  - Skips are silent: no toast.
 - **Sleep timer:** `setSleepTimer(duration)` fades out over about 5 s and then pauses. `sleepAtEndOfSong()` pauses on completion instead of advancing. State is in `sleepTimer` (`sleepTimerProvider`).
 - **Speed:** `setSpeed` (overrides BaseAudioHandler) with `speedProvider`.
 - **Equalizer and loudness:**
