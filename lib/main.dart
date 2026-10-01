@@ -9,6 +9,7 @@ import 'data/error_log.dart';
 import 'data/stream_resolver.dart';
 import 'innertube/innertube.dart';
 import 'player/audio_handler.dart';
+import 'player/lock_screen.dart';
 import 'providers.dart';
 import 'ui/router.dart';
 import 'ui/theme/ytm_theme.dart';
@@ -71,13 +72,41 @@ class YouPipeApp extends ConsumerStatefulWidget {
   ConsumerState<YouPipeApp> createState() => _YouPipeAppState();
 }
 
-class _YouPipeAppState extends ConsumerState<YouPipeApp> {
+class _YouPipeAppState extends ConsumerState<YouPipeApp> with WidgetsBindingObserver {
   final _router = buildRouter();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     ref.read(downloadManagerProvider).resumePending();
+    _syncLockScreenPermission();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _syncLockScreenPermission();
+  }
+
+  /// Turns "Lock screen player" off when "Display over other apps" is missing. Auto Backup brings the
+  /// setting back after a reinstall but not the grant, and the user can revoke it at any time.
+  Future<void> _syncLockScreenPermission() async {
+    if (!ref.read(settingsProvider).lockScreenPlayer) return;
+    try {
+      if (await LockScreenPlayer.canShow() || !mounted) return;
+      final settings = ref.read(settingsProvider);
+      if (settings.lockScreenPlayer) {
+        await ref.read(settingsProvider.notifier).update(settings.copyWith(lockScreenPlayer: false));
+      }
+    } catch (e, st) {
+      errorLog.add('lockscreen', e, stack: st);
+    }
   }
 
   @override
