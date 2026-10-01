@@ -77,7 +77,10 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     });
     _player.currentIndexStream.listen(_onPlayerIndex);
     _player.positionStream.listen((p) {
-      if (_output != null) return;
+      // While the player holds another song (switching, or retrying one that never loaded), the
+      // current song's position is [_switchPosition], published by the switch.
+      if (_output != null || _holdsOtherSong) return;
+      _phonePositions.add(p);
       _skipSegments(p);
       // The player resets its position when it fails; keep where the song was to resume there.
       if (p > Duration.zero && _player.processingState != ProcessingState.idle) _lastPosition = p;
@@ -211,16 +214,51 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// While [_loadIndex] waits for `setAudioSource`, whose failure its own catch handles.
   bool _settingSource = false;
 
+  // Changing to another song on the phone (docs/playback.md): the old song is paused at once and,
+  // until the new one is loaded, the session reports it as loading at [_switchPosition]. Before
+  // this, the old song kept playing under the new song's title while the new URL was resolved.
+  bool _switching = false;
+
+  /// Whether the song being switched to plays once loaded; Play and Pause change it meanwhile.
+  bool _switchAutoplay = true;
+  Duration _switchPosition = Duration.zero;
+
+  /// The phone player's positions, held back while switching songs.
+  final _phonePositions = StreamController<Duration>.broadcast();
+
   /// Serializes changes to the preloaded next song (see [_syncPreloaded]).
   Future<void> _preloadOp = Future.value();
   Timer? _preloadRetry;
 
   /// Follows the active output; `positionProvider` re-subscribes when that changes.
-  Stream<Duration> get positionStream => _remoteActive ? _remotePositions.stream : _player.positionStream;
+  Stream<Duration> get positionStream => _remoteActive ? _remotePositions.stream : _phonePositionStream();
   Stream<Duration> get bufferedPositionStream => _player.bufferedPositionStream;
-  Duration get position => _remoteActive ? _remotePosition : _player.position;
-  Duration? get duration => _remoteActive ? (_remote?.duration ?? mediaItem.value?.duration) : _player.duration;
-  bool get _isPlaying => _remoteActive ? (_remote?.playing ?? false) : _player.playing;
+  Duration get position => _remoteActive ? _remotePosition : (_holdsOtherSong ? _switchPosition : _player.position);
+  Duration? get duration => _remoteActive
+      ? (_remote?.duration ?? mediaItem.value?.duration)
+      : (_holdsOtherSong ? mediaItem.value?.duration : _player.duration);
+  bool get _isPlaying => _remoteActive ? (_remote?.playing ?? false) : (_switching ? _switchAutoplay : _player.playing);
+
+  Stream<Duration> _phonePositionStream() async* {
+    yield position;
+    yield* _phonePositions.stream;
+  }
+
+  /// The song the phone player holds now.
+  String? get _playerSongId {
+    final seq = _player.sequence;
+    final i = _player.currentIndex ?? 0;
+    return i < seq.length ? seq[i].tag as String? : null;
+  }
+
+  /// The phone player still holds a song other than the current one: while switching, or while
+  /// retrying a song that never loaded. Its position and duration belong to that other song then.
+  bool get _holdsOtherSong {
+    if (_remoteActive) return false;
+    if (_switching) return true;
+    final held = _playerSongId;
+    return held != null && held != queueState.value.current?.videoId;
+  }
 
   Future<void> _initSession() async {
     final session = await AudioSession.instance;
@@ -374,13 +412,28 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     final song = s.songs[index];
     _publish(s.copyWith(index: index));
     mediaItem.add(_nowPlaying(song));
-    playbackState.add(
-      playbackState.value.copyWith(
-        queueIndex: index,
-        processingState: AudioProcessingState.loading,
-        updatePosition: Duration.zero,
-      ),
-    );
+    // Another song on the phone (not a retry, not the preloaded one): silence the old song now rather
+    // than once the new URL is ready, which can take seconds.
+    _switching =
+        !_remoteActive &&
+        !retry &&
+        _playerSongId != song.videoId &&
+        !(position == null && !forceRefresh && _isPreloaded(song.videoId));
+    _switchPosition = position ?? Duration.zero;
+    if (_switching) {
+      _switchAutoplay = autoplay;
+      _phonePositions.add(_switchPosition);
+      unawaited(_player.pause());
+      _broadcastState(null);
+    } else {
+      playbackState.add(
+        playbackState.value.copyWith(
+          queueIndex: index,
+          processingState: AudioProcessingState.loading,
+          updatePosition: Duration.zero,
+        ),
+      );
+    }
     unawaited(_maybeExtend());
 
     try {
@@ -448,16 +501,22 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       _recovering = false;
       if (duration != null) mediaItem.add(_nowPlaying(song).copyWith(duration: duration));
       _syncPreloaded();
-      if (autoplay) await _player.play();
+      // play() reports `playing` at once (and completes only when playback stops), so the switch ends
+      // without a paused flicker.
+      final playing = (_switching ? _switchAutoplay : autoplay) ? _player.play() : null;
+      _endSwitch();
+      if (playing != null) await playing;
     } catch (e, st) {
       if (gen != _loadGeneration || e is PlayerInterruptedException) return;
+      final wanted = _switching ? _switchAutoplay : autoplay;
+      _switching = false;
       errorLog.add(
         'play',
         e is StreamResolveException ? '${e.code}: ${e.message}' : e,
         detail: _describe(song.videoId),
         stack: e is StreamResolveException || e is PlayerException ? null : st,
       );
-      if (!_remoteActive && autoplay && _canRetry(e)) {
+      if (!_remoteActive && wanted && _canRetry(e)) {
         _recover(index, position ?? Duration.zero);
         return;
       }
@@ -468,6 +527,14 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Unavailable, age- or region-restricted songs won't play on a retry either.
   static bool _canRetry(Object e) =>
       e is! StreamResolveException || e.code == 'EXTRACTION_FAILED' || e.code == 'RECAPTCHA';
+
+  /// The new song is loaded: the session follows the phone player again.
+  void _endSwitch() {
+    if (!_switching) return;
+    _switching = false;
+    _phonePositions.add(_player.position);
+    _broadcastState(null);
+  }
 
   void _showError(String message) {
     _recovering = false;
@@ -613,7 +680,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// The player moved on to the preloaded song, by itself or through [_loadIndex]'s shortcut.
   void _onPlayerIndex(int? i) {
-    if (i == null || i == 0 || _remoteActive) return;
+    // While switching, a late move to the old preloaded song mustn't override the user's choice.
+    if (i == null || i == 0 || _remoteActive || _switching) return;
     final seq = _player.sequence;
     if (i >= seq.length) return;
     final id = seq[i].tag as String?;
@@ -635,6 +703,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     _loadSegments(song.videoId, gen);
     unawaited(_maybeExtend());
     _syncPreloaded();
+    // The player's own event came before the queue followed it; publish the new song's state.
+    _broadcastState(null);
   }
 
   /// Keeps radio queues topped up: fetch more when fewer than 5 songs remain.
@@ -659,6 +729,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _onCompleted() {
+    // The old song ending while the next one loads isn't the end of the song being switched to.
+    if (_switching) return;
     if (sleepTimer.value?.endOfSong == true) {
       cancelSleepTimer();
       pause();
@@ -693,7 +765,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// expired or no longer matches the phone's IP address. Recover from the same position.
   void _onPlayerError(PlayerException e) {
     // A failed setAudioSource is handled by _loadIndex's catch, which may have scheduled a retry already.
-    if (_remoteActive || _settingSource || (_retryTimer?.isActive ?? false)) return;
+    // While switching, the error belongs to the old song, which is being replaced anyway.
+    if (_remoteActive || _settingSource || _switching || (_retryTimer?.isActive ?? false)) return;
     final s = queueState.value;
     final current = s.current;
     if (current == null) return;
@@ -728,6 +801,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         androidCompactActionIndices: const [0, 1, 2],
         processingState: _remoteActive
             ? (remote?.processingState ?? playbackState.value.processingState)
+            : _switching
+            ? AudioProcessingState.loading
             : recovering
             ? AudioProcessingState.buffering
             : playbackState.value.processingState == AudioProcessingState.error &&
@@ -742,7 +817,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
               }[_player.processingState]!,
         playing: playing,
         updatePosition: position,
-        bufferedPosition: _remoteActive ? _remotePosition : _player.bufferedPosition,
+        bufferedPosition: _remoteActive
+            ? _remotePosition
+            : (_holdsOtherSong ? _switchPosition : _player.bufferedPosition),
         speed: _player.speed,
         queueIndex: s.index,
         shuffleMode: s.shuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
@@ -857,6 +934,12 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       }
       return _output!.play();
     }
+    // The next song is still loading: play it once it's there (not the old song the player holds).
+    if (_switching) {
+      _switchAutoplay = true;
+      _broadcastState(null);
+      return;
+    }
     // After an error, or a player that failed and went idle, or while waiting to retry: load again
     // now, from where the song was.
     if (queueState.value.current != null &&
@@ -871,6 +954,11 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> pause() async {
     if (_remoteActive) return _output!.pause();
+    if (_switching) {
+      _switchAutoplay = false;
+      _broadcastState(null);
+      return;
+    }
     if (_recovering) {
       _retryTimer?.cancel();
       _recovering = false;
@@ -952,7 +1040,8 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       await _player.setVolume(i / steps);
       await Future<void>.delayed(const Duration(milliseconds: 250));
     }
-    await _player.pause();
+    // Through the handler, so a song that's still loading stays paused too.
+    await pause();
     await _player.setVolume(1);
     cancelSleepTimer();
   }
@@ -975,6 +1064,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     _retryTimer?.cancel();
     _preloadRetry?.cancel();
     _recovering = false;
+    _switching = false;
     if (_remoteActive) await _output?.pause();
     await _player.stop();
     await super.stop();
