@@ -73,9 +73,13 @@ class _SyncedLyricsState extends ConsumerState<_SyncedLyrics> {
 
   @override
   Widget build(BuildContext context) {
-    final position = ref.watch(positionProvider).value ?? Duration.zero;
-    // A little lead so the line lights up as it starts, like YouTube Music.
-    final active = activeLineIndex(_lines, position + const Duration(milliseconds: 250));
+    // A little lead so the line lights up as it starts, like YouTube Music. Watching only the active
+    // line (not every position tick) rebuilds the list once per line instead of several times a second.
+    final active = ref.watch(
+      positionProvider.select(
+        (p) => activeLineIndex(_lines, (p.value ?? Duration.zero) + const Duration(milliseconds: 250)),
+      ),
+    );
     if (active != _active) {
       _active = active;
       WidgetsBinding.instance.addPostFrameCallback((_) => _follow(active));

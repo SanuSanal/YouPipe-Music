@@ -230,6 +230,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> _preloadOp = Future.value();
   Timer? _preloadRetry;
 
+  /// The last native playlist edit ([_edit]); `setAudioSource` waits for it.
+  Future<void> _edits = Future.value();
+
   /// Follows the active output; `positionProvider` re-subscribes when that changes.
   Stream<Duration> get positionStream => _remoteActive ? _remotePositions.stream : _phonePositionStream();
   Stream<Duration> get bufferedPositionStream => _player.bufferedPositionStream;
@@ -291,8 +294,11 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _publish(QueueState state) {
+    // Most publishes only move the index. The whole queue crosses the platform channel to the media
+    // session, and radio queues only grow, so send it only when the songs changed.
+    final songsChanged = !identical(state.songs, queueState.value.songs);
     queueState.value = state;
-    queue.add(state.songs.map(toMediaItem).toList());
+    if (songsChanged) queue.add(state.songs.map(toMediaItem).toList());
   }
 
   // Queue building ---------------------------------------------------------------------------
@@ -490,9 +496,15 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         if (gen != _loadGeneration) return;
         source = AudioSource.uri(Uri.parse(stream.url), tag: song.videoId);
       }
+      // A retry starts from a fresh native player: stop() releases it. A failed player can be left
+      // with a stale load reply ("Reply already submitted") that fails every later load otherwise.
+      if (retry) await _player.stop();
+      if (gen != _loadGeneration) return;
       _settingSource = true;
       final Duration? duration;
       try {
+        // An edit already running finishes first; new ones wait until this load is done.
+        await _edits;
         duration = await _player.setAudioSource(source, initialPosition: position);
       } finally {
         _settingSource = false;
@@ -652,14 +664,19 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     final at = _player.currentIndex ?? 0;
     if (current == null || at >= _player.sequence.length || _player.sequence[at].tag != current.videoId) return;
     // Drop the song the player already moved on from.
-    if (at > 0) await _player.removeAudioSourceRange(0, at);
+    final dropped = await _edit(gen, () async {
+      final i = _player.currentIndex ?? 0;
+      if (i > 0) await _player.removeAudioSourceRange(0, i);
+    });
+    if (!dropped) return;
     final upcoming = _upcomingIndex();
     final want = upcoming == null ? null : queueState.value.songs[upcoming].videoId;
-    final length = _player.sequence.length;
-    if (length == 2 && _player.sequence[1].tag == want) return;
-    if (gen != _loadGeneration) return;
-    if (length > 1) await _player.removeAudioSourceRange(1, length);
-    if (want == null) return;
+    if (_player.sequence.length == 2 && _player.sequence[1].tag == want) return;
+    final cleared = await _edit(gen, () async {
+      final n = _player.sequence.length;
+      if (n > 1) await _player.removeAudioSourceRange(1, n);
+    });
+    if (!cleared || want == null) return;
     final local = await localFile?.call(want);
     final AudioSource source;
     if (local != null) {
@@ -667,16 +684,37 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     } else {
       source = AudioSource.uri(Uri.parse((await _resolver.resolve(want)).url), tag: want);
     }
-    final upcomingNow = _upcomingIndex();
-    if (gen != _loadGeneration ||
-        _remoteActive ||
-        _player.sequence.length != 1 ||
-        upcomingNow == null ||
-        queueState.value.songs[upcomingNow].videoId != want) {
-      return;
-    }
-    await _player.addAudioSource(source);
+    await _edit(gen, () async {
+      final upcomingNow = _upcomingIndex();
+      if (_player.sequence.length != 1 || upcomingNow == null || queueState.value.songs[upcomingNow].videoId != want) {
+        return;
+      }
+      await _player.addAudioSource(source);
+    });
   }
+
+  /// Runs one edit of the player's playlist after the previous one, and only while [gen]'s load is
+  /// still current and the player is settled: an edit landing while a song loads, or while a failed
+  /// player is being reloaded, can wedge just_audio's Android player (docs/playback.md). Returns
+  /// whether the edit ran.
+  Future<bool> _edit(int gen, Future<void> Function() op) {
+    final run = _edits.then((_) async {
+      if (!_canEditPlaylist(gen)) return false;
+      await op();
+      return true;
+    });
+    _edits = run.then((_) {}, onError: (Object _) {});
+    return run;
+  }
+
+  bool _canEditPlaylist(int gen) =>
+      gen == _loadGeneration &&
+      !_remoteActive &&
+      !_settingSource &&
+      !_recovering &&
+      !_switching &&
+      _player.processingState != ProcessingState.idle &&
+      _player.processingState != ProcessingState.loading;
 
   /// The player moved on to the preloaded song, by itself or through [_loadIndex]'s shortcut.
   void _onPlayerIndex(int? i) {

@@ -34,8 +34,9 @@ class ResponsiveListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isCurrent = item is SongItem && ref.watch(currentSongProvider)?.videoId == item.id;
-    final downloaded = item is SongItem && ref.watch(downloadedIdsProvider).contains(item.id);
+    // `select`: a row rebuilds only when its own song starts/stops playing or finishes downloading.
+    final isCurrent = item is SongItem && ref.watch(currentSongProvider.select((s) => s?.videoId == item.id));
+    final downloaded = item is SongItem && ref.watch(downloadedIdsProvider.select((ids) => ids.contains(item.id)));
     final theme = Theme.of(context);
 
     final Widget leading;

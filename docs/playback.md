@@ -4,7 +4,7 @@
 
 `BaseAudioHandler with SeekHandler` wrapping one `just_audio` `AudioPlayer`. It provides background playback, the notification, lockscreen and headset controls, and Android Auto.
 
-- **The queue lives in the handler** as `ValueNotifier<QueueState>` (songs, index, shuffle, repeat, title). audio_service's `queue`/`mediaItem` are kept in sync for the system UI. The UI reads it through `queueStateProvider`, `currentSongProvider`, `playbackStateProvider` and `positionProvider`.
+- **The queue lives in the handler** as `ValueNotifier<QueueState>` (songs, index, shuffle, repeat, title). audio_service's `queue`/`mediaItem` are kept in sync for the system UI. `_publish` sends `queue` to the media session only when the song list changed, not when only the index moved: radio queues only grow, and each send crosses the platform channel. The UI reads it through `queueStateProvider`, `currentSongProvider`, `playbackStateProvider` and `positionProvider`.
 - **The current song plus the next one** are loaded, not the whole queue, because stream URLs expire and are resolved lazily. `_loadIndex` loads a song:
   1. If `localFile(videoId)` finds a download, play that file.
   2. Otherwise resolve the stream URL.
@@ -12,6 +12,9 @@
 - **Preloading the next song (gapless):** on the phone's own player, just_audio's playlist is `[current, upcoming]`. ExoPlayer buffers the upcoming song before the current one ends and moves on with no gap.
   - `_upcomingIndex()` is the next queue index, or `0` with repeat-all at the end. It's null with repeat-one, with sleep-at-end-of-song, or at the end of the queue; then nothing is preloaded and `_onCompleted` handles the end as before.
   - `_syncPreloaded()` rebuilds the second slot. It runs after every queue edit, shuffle, repeat or sleep-at-end change. The work is serialized on `_preloadOp` and guarded by `_loadGeneration`.
+  - **Playlist edits go through `_edit` (fixed 2026-10-01).** Each `removeAudioSourceRange`/`addAudioSource` runs after the previous edit, and only while the same load is current and the player is settled: not loading, not idle or failed, not switching or recovering. `_loadIndex` waits for an in-flight edit (`_edits`) before `setAudioSource`.
+    - **Why:** an edit that landed while a failed song was being reloaded left just_audio 0.10.6's Android player with a stale load reply. Its `sendError` throws "Reply already submitted" before clearing `prepareResult`, so every later load failed until the app restarted. Seen once in a scripted run of rapid skips, after a `Source error`.
+    - **Safety net:** a retry starts with `_player.stop()`, which releases the native player, so the next load gets a fresh one even if it wedges anyway.
   - When preloading fails (for example with no signal), it's logged and tried again every 20 s for as long as the same song plays.
   - `_onPlayerIndex` (on `currentIndexStream`) handles the automatic move: it publishes the new queue index, media item and SponsorBlock segments, then preloads the one after.
   - Skipping to the preloaded song (Next, SponsorBlock ending a song, tapping it in Up next) uses `seekToNext()` in place of a reload.

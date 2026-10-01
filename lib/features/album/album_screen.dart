@@ -43,7 +43,9 @@ class _AlbumView extends ConsumerWidget {
     final album = page.album;
     final saved = ref.watch(isSavedProvider(album)).value ?? false;
     final actions = ref.read(playerActionsProvider);
-    final downloadedIds = ref.watch(downloadedIdsProvider);
+    final allDownloaded = ref.watch(
+      downloadedIdsProvider.select((ids) => page.songs.isNotEmpty && page.songs.every((s) => ids.contains(s.videoId))),
+    );
     final artist = album.artists.where((a) => a.id != null).firstOrNull;
 
     return TintedPage(
@@ -61,7 +63,7 @@ class _AlbumView extends ConsumerWidget {
             description: page.description,
             saved: saved,
             onPlay: () => actions.playList(page.songs, title: album.title),
-            downloaded: page.songs.isNotEmpty && page.songs.every((s) => downloadedIds.contains(s.videoId)),
+            downloaded: allDownloaded,
             onDownload: () {
               ref.read(downloadManagerProvider).enqueue(page.songs);
               showSnack(context, 'Downloading ${songCount(page.songs.length)}');

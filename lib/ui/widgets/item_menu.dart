@@ -342,27 +342,50 @@ Future<void> showSaveToPlaylist(BuildContext context, WidgetRef ref, List<SongIt
   );
 }
 
-Future<String?> promptText(BuildContext context, {required String title, String? hint, String? initial}) {
-  final controller = TextEditingController(text: initial);
-  return showDialog<String>(
-    context: context,
-    builder: (dialog) => AlertDialog(
-      backgroundColor: YtmColors.surface,
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        decoration: InputDecoration(
-          hintText: hint,
-          border: const UnderlineInputBorder(),
-          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: YtmColors.textPrimary)),
-        ),
-        onSubmitted: (v) => Navigator.of(dialog).pop(v),
+Future<String?> promptText(BuildContext context, {required String title, String? hint, String? initial}) =>
+    showDialog<String>(
+      context: context,
+      builder: (_) => _PromptDialog(title: title, hint: hint, initial: initial),
+    );
+
+/// A one-field dialog that owns (and disposes) its text controller.
+class _PromptDialog extends StatefulWidget {
+  const _PromptDialog({required this.title, this.hint, this.initial});
+
+  final String title;
+  final String? hint;
+  final String? initial;
+
+  @override
+  State<_PromptDialog> createState() => _PromptDialogState();
+}
+
+class _PromptDialogState extends State<_PromptDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    backgroundColor: YtmColors.surface,
+    title: Text(widget.title),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        border: const UnderlineInputBorder(),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: YtmColors.textPrimary)),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(dialog).pop(), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.of(dialog).pop(controller.text), child: const Text('Save')),
-      ],
+      onSubmitted: (v) => Navigator.of(context).pop(v),
     ),
+    actions: [
+      TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+      TextButton(onPressed: () => Navigator.of(context).pop(_controller.text), child: const Text('Save')),
+    ],
   );
 }

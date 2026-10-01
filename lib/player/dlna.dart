@@ -149,6 +149,7 @@ class DlnaSession implements RemotePlayback {
     } catch (_) {}
     await CastRelay.stop();
     _status.value = const CastStatus();
+    await _player.close();
   }
 
   @override
@@ -244,7 +245,8 @@ class DlnaSession implements RemotePlayback {
             url: _url,
           );
       }
-      _player.add(update);
+      // A poll that was already running when the session closed has nowhere to report.
+      if (_poll != null) _player.add(update);
     } catch (e) {
       if (++_failures >= 5) {
         debugPrint('YouPipe: lost ${renderer.name}: $e');

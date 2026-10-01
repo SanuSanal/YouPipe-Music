@@ -14,6 +14,7 @@ These docs record the architecture and the decisions a new session needs in orde
 | [ui.md](ui.md) | screens, widgets, theme, navigation, player panel, branding |
 | [data.md](data.md) | drift database, migrations, library, settings storage |
 | [account.md](account.md) | Google sign-in, authenticated requests, account sync |
+| [performance.md](performance.md) | anything showing per-song state, images, growing tables or ticking widgets; measuring memory and frames |
 | [testing.md](testing.md) | tests, fixtures, running on a device |
 | [release.md](release.md) | the release workflow, signing, R8 keep rules, `android/app/build.gradle.kts` |
 | [lockscreen.md](lockscreen.md) | the opt-in lock screen player: `LockScreenActivity.kt`, `LockScreenLauncher.kt` |

@@ -46,13 +46,18 @@ class YtImage extends StatelessWidget {
       alignment: Alignment.center,
       child: Icon(fallbackIcon, color: YtmColors.textSecondary, size: size * 0.4),
     );
+    // Decode at the box's height in pixels, not the file's: fixed-size video thumbnails and saved
+    // artwork are otherwise decoded at full resolution even in small rows (docs/performance.md).
+    // Only the height is given, so the width follows the image's aspect and cover stays sharp.
+    final decodeHeight = (px / aspectRatio).round();
     final image = url == null
         ? placeholder
         : url.startsWith('/')
-        ? Image.file(File(url), fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder)
+        ? Image.file(File(url), fit: BoxFit.cover, cacheHeight: decodeHeight, errorBuilder: (_, _, _) => placeholder)
         : CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.cover,
+            memCacheHeight: decodeHeight,
             fadeInDuration: const Duration(milliseconds: 150),
             placeholder: (_, _) => Container(color: YtmColors.surface),
             errorWidget: (_, _, _) => placeholder,

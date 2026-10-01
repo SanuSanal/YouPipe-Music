@@ -33,7 +33,6 @@ import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
 import com.ryanheise.audioservice.AudioService
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.Executors
 
@@ -378,7 +377,8 @@ class LockScreenActivity : Activity() {
     }
 
     companion object {
-        private val http = OkHttpClient()
+        // Shares the app's connection pool and dispatcher threads.
+        private val http = Googlevideo.client
 
         private fun formatTime(ms: Long): String {
             val seconds = ms / 1000
