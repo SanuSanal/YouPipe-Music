@@ -17,6 +17,14 @@
   - Skipping to the preloaded song (Next, SponsorBlock ending a song, tapping it in Up next) uses `seekToNext()` in place of a reload.
   - Cast and video mode don't preload; their `_loadIndex` path is unchanged.
 - **Stale-load guard:** `_loadGeneration` makes sure a slow load can't override a newer choice.
+- **Switching songs (fixed 2026-10-01):** resolving a new URL takes 1–3 s or more. Before this fix, nothing paused the old song during that time. It kept playing under the new song's title, with a loading spinner and a moving progress bar. If it ended first, `_onCompleted` skipped the song the user had picked.
+  - Now `_loadIndex` sets `_switching` when the phone player changes to a different song (not a retry, not the preloaded shortcut). It pauses the old song at once.
+  - **Until the new song is loaded,** the session reports `loading` at 0:00 (`_switchPosition`), and `playing` follows `_switchAutoplay`. Position and duration come from the new song, and the old song's positions are held back.
+  - **Failed loads:** if the new song fails to load and is retried, the player still holds the old song. `_holdsOtherSong` keeps the position at `_switchPosition` (shown as buffering) until a retry loads it.
+  - **Tested 2026-10-01:** Wi-Fi was turned off right after picking a new song. The old song paused at once; the UI showed the new song buffering at 0:00 while the retries ran; it played from 0:00 once the phone was back online.
+  - **Play and Pause** only change `_switchAutoplay`, so they never resume the old song.
+  - **Ignored while switching:** `_onCompleted`, `_onPlayerIndex` and `_onPlayerError`.
+- **just_audio's position is calculated, not measured:** while `ready && playing` it is `updatePosition + elapsed × speed`. If the audio output stalls without a state change (a Bluetooth or route change, OEM audio effects), the bar keeps moving with no sound until the next native event. When a user reports "the bar moves but nothing plays", ask for the phone model, the output used, whether the equalizer and loudness are on, and the Error log.
 - **Error recovery (tested 2026-09-30 by turning Wi-Fi off and on while playing):**
   - **Where errors arrive:** just_audio 0.10 reports player errors on `errorStream`, not as errors on `playbackEventStream`. The old `onError` hook never fired, so nothing recovered.
   - **Retrying:** a player error, or a failed load that can be retried, calls `_recover`. It clears **every** cached stream URL (they're bound to the phone's IP, which usually changes after a loss of signal), then reloads the song with a fresh URL from `_lastPosition`. The first retry is immediate, then after 2, 5, 10, 20 and 30 s (`_retryDelays`, about 3.5 minutes in all). After that it shows the error state ("Can't play this song").
