@@ -250,7 +250,8 @@ class _VersionTileState extends ConsumerState<_VersionTile> {
 }
 
 /// "Lock screen player" needs "Display over other apps", granted on a system page; the setting is
-/// only saved once the user comes back with it granted.
+/// only saved once the user comes back with it granted. The switch never shows on without the grant
+/// (the app root also turns the setting off when the grant is gone, see YouPipeApp).
 class _LockScreenTile extends ConsumerStatefulWidget {
   const _LockScreenTile();
 
@@ -299,11 +300,9 @@ class _LockScreenTileState extends ConsumerState<_LockScreenTile> with WidgetsBi
       secondary: const Icon(Icons.screen_lock_portrait_outlined, color: YtmColors.textPrimary),
       title: const Text('Lock screen player'),
       subtitle: Text(
-        s.lockScreenPlayer && !_granted
-            ? 'Needs "Display over other apps" to show'
-            : 'Full-screen artwork and controls on the lock screen',
+        _granted ? 'Full-screen artwork and controls on the lock screen' : 'Needs "Display over other apps"',
       ),
-      value: s.lockScreenPlayer,
+      value: s.lockScreenPlayer && _granted,
       activeTrackColor: YtmColors.brandRed,
       onChanged: (v) {
         if (!v || _granted) {
