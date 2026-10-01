@@ -17,7 +17,7 @@ Decisions that are easy to break by accident:
 
 ## After making changes
 
-- **Update the docs in the same change** when you alter architecture, a decision, an endpoint or parser behaviour, the schema, the settings keys, the navigation or player behaviour, or the status in `docs/roadmap.md`. Only record what a future session would need; not every small choice.
+- **Update the docs in the same change** when you alter architecture, a decision, an endpoint or parser behaviour, the schema, the settings keys, the navigation or player behaviour, or the status in `docs/roadmap.md`. Only record what a future session would need; not every small choice. Any added, removed or changed network call or platform channel also goes in `docs/apis.md`.
 - **Keep docs modular:** edit the relevant `docs/*.md`, and add a new module (linked from `docs/README.md`) rather than growing one file without limit.
 - **A schema change** needs a `schemaVersion` bump, an `onUpgrade` step, and `dart run build_runner build --delete-conflicting-outputs`.
 

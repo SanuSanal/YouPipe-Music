@@ -7,6 +7,7 @@ These docs record the architecture and the decisions a new session needs in orde
 | Doc | Read when you touch |
 |---|---|
 | [architecture.md](architecture.md) | anything: layers, wiring, folder map, conventions |
+| [apis.md](apis.md) | any network call or platform channel: the full list of external APIs, endpoints and channel methods |
 | [innertube.md](innertube.md) | `lib/innertube/**`: endpoints, parsers, fixtures |
 | [streaming.md](streaming.md) | stream URLs, downloads, the Kotlin channels, NewPipeExtractor |
 | [playback.md](playback.md) | `lib/player/**`: queue, radio, sleep timer, effects, SponsorBlock, Android Auto |
