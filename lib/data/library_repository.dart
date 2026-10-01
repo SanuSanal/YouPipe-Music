@@ -14,9 +14,12 @@ class LocalPlaylistSummary {
 
 /// Everything the user keeps locally: likes, history, saved items, own playlists, searches.
 class LibraryRepository {
-  LibraryRepository(this._db);
+  LibraryRepository(this._db, {this.historyLimit = defaultHistoryLimit});
 
   final AppDatabase _db;
+
+  /// How many plays History keeps (see [defaultHistoryLimit]).
+  final int historyLimit;
 
   Future<void> _upsertSong(SongItem s) => _db.into(_db.songs).insertOnConflictUpdate(songToCompanion(s));
 
@@ -45,11 +48,22 @@ class LibraryRepository {
 
   // History ------------------------------------------------------------------------------------
 
+  /// Plays kept in [PlayHistory]. One row is added per play; without a cap the table (and the
+  /// grouping query behind [watchHistory]) grows for ever. 2000 plays cover far more than the 200
+  /// songs History shows.
+  static const defaultHistoryLimit = 2000;
+
   Future<void> addToHistory(SongItem song) async {
     await _upsertSong(song);
     await _db
         .into(_db.playHistory)
         .insert(PlayHistoryCompanion.insert(videoId: song.videoId, playedAt: DateTime.now()));
+    await _db.customUpdate(
+      'DELETE FROM play_history WHERE id NOT IN (SELECT id FROM play_history ORDER BY played_at DESC, id DESC LIMIT ?)',
+      variables: [Variable.withInt(historyLimit)],
+      updates: {_db.playHistory},
+      updateKind: UpdateKind.delete,
+    );
   }
 
   /// Most recent plays, one entry per song.

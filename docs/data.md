@@ -6,7 +6,7 @@
 |---|---|
 | `Songs` | Cache of song metadata (artists as JSON), so library views work offline. Every table that references songs upserts here first |
 | `LikedSongs` | Local likes (`likedAt`) |
-| `PlayHistory` | One row per play; the UI groups by song, newest first |
+| `PlayHistory` | One row per play; the UI groups by song, newest first. Capped at the newest 2000 plays (`LibraryRepository.historyLimit`, pruned in `addToHistory`) so the grouping query stays fast |
 | `SavedAlbums`, `SavedArtists`, `SavedPlaylists` | Items saved or subscribed locally |
 | `LocalPlaylists`, `LocalPlaylistItems` | Playlists made in YouPipe (ordered by `position`, cascade delete) |
 | `SearchHistory` | Recent searches (the query is the primary key) |

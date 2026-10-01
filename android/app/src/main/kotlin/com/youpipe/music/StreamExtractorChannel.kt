@@ -4,7 +4,6 @@ import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
-import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
@@ -40,6 +39,10 @@ object StreamExtractorChannel {
 
     @Volatile
     private var initialized = false
+
+    /** The `hl-gl` NewPipe is set up for; Settings can change them while the app runs. */
+    @Volatile
+    private var localeKey: String? = null
 
     fun register(messenger: BinaryMessenger) {
         MethodChannel(messenger, CHANNEL).setMethodCallHandler { call, result ->
@@ -148,13 +151,17 @@ object StreamExtractorChannel {
         hl: String,
         gl: String,
     ) {
-        if (!initialized) {
-            synchronized(this) {
-                if (!initialized) {
-                    NewPipe.init(OkHttpDownloader, Localization(hl, gl), ContentCountry(gl))
-                    initialized = true
-                }
+        val key = "$hl-$gl"
+        if (localeKey == key) return
+        synchronized(this) {
+            if (!initialized) {
+                NewPipe.init(OkHttpDownloader, Localization(hl, gl), ContentCountry(gl))
+                initialized = true
+            } else if (localeKey != key) {
+                // The language or country changed in Settings since the first extraction.
+                NewPipe.setupLocalization(Localization(hl, gl), ContentCountry(gl))
             }
+            localeKey = key
         }
     }
 
@@ -300,9 +307,11 @@ object StreamExtractorChannel {
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"
 
+        // Built from the shared client, so extraction, downloads and the lock screen use one
+        // connection pool and one set of dispatcher threads.
         private val client =
-            OkHttpClient
-                .Builder()
+            Googlevideo.client
+                .newBuilder()
                 .readTimeout(30, TimeUnit.SECONDS)
                 .build()
 

@@ -45,7 +45,9 @@ class _PlaylistView extends ConsumerWidget {
     final playlist = page.playlist;
     final saved = ref.watch(isSavedProvider(playlist)).value ?? false;
     final actions = ref.read(playerActionsProvider);
-    final downloadedIds = ref.watch(downloadedIdsProvider);
+    final allDownloaded = ref.watch(
+      downloadedIdsProvider.select((ids) => page.songs.isNotEmpty && page.songs.every((s) => ids.contains(s.videoId))),
+    );
     final controller = ref.read(playlistProvider(playlistId).notifier);
     final author = playlist.author;
 
@@ -69,7 +71,7 @@ class _PlaylistView extends ConsumerWidget {
               description: page.description,
               saved: saved,
               onPlay: () async => actions.playList(await controller.allSongs(), title: playlist.title),
-              downloaded: page.songs.isNotEmpty && page.songs.every((s) => downloadedIds.contains(s.videoId)),
+              downloaded: allDownloaded,
               onDownload: () {
                 ref.read(downloadManagerProvider).enqueue(page.songs);
                 showSnack(context, 'Downloading ${songCount(page.songs.length)}');

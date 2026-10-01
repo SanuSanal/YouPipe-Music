@@ -16,6 +16,7 @@ flutter test --tags live --run-skipped   # hits the real InnerTube API (smoke te
 | `test/lyrics_test.dart` | LRC parsing, active line, title cleaning |
 | `test/stream_resolver_test.dart` | Audio stream choice for Low/Normal/High (Opus first, AAC fallback) |
 | `test/audio_effects_test.dart` | The equalizer channel wrapper: a refused equalizer is reported unavailable and logged, never thrown |
+| `test/performance_test.dart` | Play history cap; finished-download ids ignore progress writes; a song row is only notified about its own download (see performance.md) |
 | `test/auto_browser_test.dart` | The Android Auto tree, using a Dio interceptor that serves fixtures and an in-memory drift DB (`NativeDatabase.memory()`) |
 
 - **Mocking InnerTube:** pass a `Dio` with an interceptor that resolves requests to fixture JSON (see `auto_browser_test.dart`).

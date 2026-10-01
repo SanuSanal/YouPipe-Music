@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -122,6 +123,15 @@ class DownloadManager {
     )..where((t) => t.videoId.equals(videoId) & t.status.equalsValue(DownloadStatus.done))).getSingleOrNull();
     final path = row?.filePath;
     return path != null && File(path).existsSync() ? path : null;
+  }
+
+  /// Video ids of finished downloads. Emits only when that set changes: progress writes (every
+  /// 400 ms while downloading) and song upserts would otherwise rebuild every song row.
+  Stream<Set<String>> watchDoneIds() {
+    final q = _db.selectOnly(_db.downloads)
+      ..addColumns([_db.downloads.videoId])
+      ..where(_db.downloads.status.equalsValue(DownloadStatus.done));
+    return q.watch().map((rows) => {for (final r in rows) r.read(_db.downloads.videoId)!}).distinct(setEquals);
   }
 
   Stream<List<DownloadEntry>> watchAll() {

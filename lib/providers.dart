@@ -38,19 +38,20 @@ final downloadManagerProvider = Provider<DownloadManager>((ref) {
 
 final downloadsProvider = StreamProvider<List<DownloadEntry>>((ref) => ref.watch(downloadManagerProvider).watchAll());
 
-/// Video ids of finished downloads (for the row indicator).
-final downloadedIdsProvider = Provider<Set<String>>(
-  (ref) => {
-    for (final d in ref.watch(downloadsProvider).value ?? const <DownloadEntry>[])
-      if (d.row.status == DownloadStatus.done) d.song.videoId,
-  },
-);
+final _doneIdsProvider = StreamProvider<Set<String>>((ref) => ref.watch(downloadManagerProvider).watchDoneIds());
+
+/// Video ids of finished downloads (for the row indicator). Changes only when a download finishes
+/// or is removed; watch it with `select` so a row rebuilds only for its own song (docs/performance.md).
+final downloadedIdsProvider = Provider<Set<String>>((ref) => ref.watch(_doneIdsProvider).value ?? const {});
 
 /// Download state of one song (null = not downloaded).
-final downloadStatusProvider = Provider.family<DownloadStatus?, String>((ref, videoId) {
-  final all = ref.watch(downloadsProvider).value ?? const <DownloadEntry>[];
-  return all.where((d) => d.song.videoId == videoId).firstOrNull?.row.status;
-});
+final downloadStatusProvider = Provider.autoDispose.family<DownloadStatus?, String>(
+  (ref, videoId) => ref.watch(
+    downloadsProvider.select(
+      (all) => (all.value ?? const <DownloadEntry>[]).where((d) => d.song.videoId == videoId).firstOrNull?.row.status,
+    ),
+  ),
+);
 
 /// Hooks the Android Auto browse tree into the audio handler (watched from the app root).
 final autoBrowserProvider = Provider<AutoBrowser>((ref) {

@@ -230,6 +230,7 @@ class CastController with WidgetsBindingObserver implements RemotePlayback {
 
   _Chromecast? _chromecast;
   DlnaSession? _dlna;
+  StreamSubscription<RemotePlayer>? _dlnaPlayer;
   List<CastDevice> _dlnaDevices = const [];
   bool _searching = false;
 
@@ -279,7 +280,7 @@ class CastController with WidgetsBindingObserver implements RemotePlayback {
     final session = DlnaSession(device.dlna!, onEnded: _onDlnaEnded);
     _dlna = session;
     session.status.addListener(_update);
-    session.player.listen(_player.add);
+    _dlnaPlayer = session.player.listen(_player.add);
     _update();
     await session.connect();
   }
@@ -289,6 +290,8 @@ class CastController with WidgetsBindingObserver implements RemotePlayback {
     _dlna = null;
     if (dlna != null) {
       dlna.status.removeListener(_update);
+      await _dlnaPlayer?.cancel();
+      _dlnaPlayer = null;
       await dlna.close();
     }
     if (_chromecast?.status.value.state case CastState.connected || CastState.connecting) {
