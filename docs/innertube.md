@@ -10,6 +10,8 @@
 
 ## Endpoints in use
 
+Request bodies, headers and ID prefixes for every endpoint are listed in [apis.md](apis.md).
+
 | Method | Endpoint / browseId | Parser |
 |---|---|---|
 | `home({chip})` | browse `FEmusic_home` (a chip's own browse endpoint when filtered) | `parseHome` |
