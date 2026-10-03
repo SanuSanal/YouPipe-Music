@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,7 +77,9 @@ class _VideoFullscreenState extends ConsumerState<_VideoFullscreen> {
     });
     final handler = ref.read(audioHandlerProvider);
     final song = ref.watch(currentSongProvider);
-    final playing = ref.watch(playbackStateProvider).value?.playing ?? false;
+    final state = ref.watch(playbackStateProvider).value;
+    final playing = state?.playing ?? false;
+    final failed = state?.processingState == AudioProcessingState.error;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -149,7 +152,13 @@ class _VideoFullscreenState extends ConsumerState<_VideoFullscreen> {
                                 const SizedBox(width: 40),
                                 IconButton(
                                   iconSize: 56,
-                                  icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                                  icon: Icon(
+                                    failed
+                                        ? Icons.refresh
+                                        : playing
+                                        ? Icons.pause
+                                        : Icons.play_arrow,
+                                  ),
                                   onPressed: playing ? handler.pause : handler.play,
                                 ),
                                 const SizedBox(width: 40),

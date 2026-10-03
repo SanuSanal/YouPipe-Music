@@ -30,10 +30,19 @@ class SponsorBlockService {
 
   final Dio _dio;
   final _cache = <String, List<SkipSegment>>{};
+  final _pending = <String, Future<List<SkipSegment>>>{};
 
-  Future<List<SkipSegment>> segmentsFor(String videoId) async {
+  Future<List<SkipSegment>> segmentsFor(String videoId) {
     final cached = _cache[videoId];
-    if (cached != null) return cached;
+    if (cached != null) return Future.value(cached);
+    // Callers asking for the same video at once share one request.
+    // (A block body: whenComplete would wait for the future remove() returns, which is this one.)
+    return _pending[videoId] ??= _fetch(videoId).whenComplete(() {
+      _pending.remove(videoId);
+    });
+  }
+
+  Future<List<SkipSegment>> _fetch(String videoId) async {
     final prefix = sha256.convert(utf8.encode(videoId)).toString().substring(0, 4);
     List<SkipSegment> result;
     try {

@@ -35,5 +35,8 @@
 - **The Library "Recent activity" sort** doesn't do anything yet.
 - **Android Auto:** playback and the launcher entry work on a real car (sideloaded builds need Unknown sources, see playback.md). Browsing the tree and voice or keyboard search in the car are still unchecked.
 - **Downloads stop** if the app process dies, because there's no WorkManager.
+- **Unavailable songs:**
+  - **While casting,** an unavailable song still fails on the receiver: `CastProxy` resolves the audio natively, without the music-video fallback.
+  - **Up next** doesn't grey out songs known to be unplayable.
 - **Account actions not yet exercised with the real account:** adding to a YouTube playlist, saving an album or playlist, subscribing.
 - **Private API:** the app uses YouTube's private API, which is against YouTube's ToS. Distribute outside the Play Store (GitHub/F-Droid).

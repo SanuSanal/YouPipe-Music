@@ -105,6 +105,13 @@ class VideoOutput implements RemotePlayback {
         debugPrint('YouPipe: video $id in HD, starting at ${hd.value.size.height.round()}p, up to ${stream.height}p');
         return hd;
       } catch (e) {
+        // Only a missing HD manifest (or one the player can't open) has the 360p stream to fall back
+        // to. An unavailable video has none (the handler plays the song instead), and an extraction
+        // that failed, e.g. without signal, would fail for 360p too (the handler retries).
+        if (e is StreamResolveException && e.code != 'NO_HD') {
+          unawaited(hd?.dispose());
+          rethrow;
+        }
         errorLog.add('video', 'No HD, using 360p: $e', detail: id);
         unawaited(hd?.dispose());
         if (_key != key) return null;

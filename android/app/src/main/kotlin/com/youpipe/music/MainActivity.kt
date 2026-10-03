@@ -7,6 +7,7 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         StreamExtractorChannel.register(flutterEngine.dartExecutor.binaryMessenger)
+        PlaybackProxy.register(flutterEngine.dartExecutor.binaryMessenger)
         DownloadChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         CookieChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         AudioEffectsChannel.register(flutterEngine.dartExecutor.binaryMessenger)

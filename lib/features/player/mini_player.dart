@@ -52,7 +52,7 @@ class MiniPlayer extends ConsumerWidget {
                             style: theme.textTheme.titleSmall,
                           ),
                           Text(
-                            error ? "Can't play this song" : song.artistNames,
+                            error ? (state?.errorMessage ?? "Can't play this song") : song.artistNames,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(color: error ? YtmColors.brandRed : null),
@@ -67,7 +67,15 @@ class MiniPlayer extends ConsumerWidget {
                               child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
                             )
                           : IconButton(
-                              icon: Icon(playing ? Icons.pause : Icons.play_arrow, size: 30),
+                              // After a failure Play reloads the song, so it shows as Reload.
+                              icon: Icon(
+                                error
+                                    ? Icons.refresh
+                                    : playing
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                                size: 30,
+                              ),
                               onPressed: playing ? handler.pause : handler.play,
                             ),
                     ),

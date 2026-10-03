@@ -9,6 +9,7 @@ import '../../features/player/mini_player.dart';
 import '../../features/player/player_screen.dart';
 import '../../features/update/update_sheet.dart';
 import '../../innertube/models.dart';
+import '../../player/audio_handler.dart' show PlayerNotice;
 import '../../providers.dart';
 import '../navigation.dart';
 import '../widgets/item_menu.dart' show showSnack;
@@ -26,13 +27,18 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderStateMixin {
   late final _panel = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-  StreamSubscription<SongItem>? _noVideo;
+  StreamSubscription<PlayerNotice>? _notices;
 
   @override
   void initState() {
     super.initState();
-    _noVideo = ref.read(audioHandlerProvider).noVideo.stream.listen((_) {
-      if (mounted) showSnack(context, 'No video for this song');
+    _notices = ref.read(audioHandlerProvider).notices.stream.listen((notice) {
+      if (!mounted) return;
+      showSnack(context, switch (notice) {
+        PlayerNotice.noVideo => 'No video for this song',
+        PlayerNotice.videoUnavailable => "Video isn't available. Playing the song",
+        PlayerNotice.songUnavailable => "This song isn't available",
+      });
     });
     // Look for a new release once the app has settled, so the check doesn't compete with startup.
     Future.delayed(const Duration(seconds: 3), () async {
@@ -43,7 +49,7 @@ class _AppShellState extends ConsumerState<AppShell> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    _noVideo?.cancel();
+    _notices?.cancel();
     _panel.dispose();
     super.dispose();
   }

@@ -7,12 +7,14 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/error_log.dart';
+import '../data/playback_proxy.dart';
 import '../data/sponsorblock.dart';
 import '../data/stream_resolver.dart';
 import '../innertube/models.dart';
 import 'audio_effects.dart';
 import 'auto_browser.dart';
 import 'cast.dart';
+import 'playable_source.dart';
 import 'video_output.dart';
 
 enum QueueRepeatMode { off, all, one }
@@ -33,6 +35,18 @@ typedef SegmentLoader = Future<List<SkipSegment>> Function(String videoId);
 
 /// Loads more songs for an endless queue (radio). Returns an empty list when exhausted.
 typedef QueueExtender = Future<List<SongItem>> Function();
+
+/// Something the app tells the user about with a toast.
+enum PlayerNotice {
+  /// Video mode: the song has no music video, so the song plays.
+  noVideo,
+
+  /// Video mode: the music video can't be played, so the song plays.
+  videoUnavailable,
+
+  /// Neither the song nor its music video can be played.
+  songUnavailable,
+}
 
 @immutable
 class QueueState {
@@ -115,8 +129,29 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   LocalFileLookup? localFile;
 
   /// Set by the app when SponsorBlock is enabled; null disables skipping.
-  SegmentLoader? segmentLoader;
+  SegmentLoader? get segmentLoader => _segmentLoader;
+  SegmentLoader? _segmentLoader;
+  set segmentLoader(SegmentLoader? loader) {
+    _segmentLoader = loader;
+    // Load again for the next song, even when it's the same one.
+    _segmentsFor = null;
+    if (loader == null) _segments = const [];
+  }
+
+  /// The music video for a song (a search); set by the app. An unavailable song plays its audio.
+  Future<String?> Function(SongItem song)? findMusicVideo;
+
+  late final _source = PlayableSource(
+    resolve: _resolver.resolve,
+    findVideo: (song) async => await findMusicVideo?.call(song),
+  );
   List<SkipSegment> _segments = const [];
+
+  /// The id [_segments] are loaded (or loading) for: the song's, or its music video's when that plays.
+  String? _segmentsFor;
+
+  /// The player's playlist entry [_onPlayerIndex] last moved the queue to.
+  IndexedAudioSource? _movedTo;
 
   // Outputs other than the phone's audio player: a Cast device while casting (docs/cast.md), else
   // the on-screen video player in video mode (docs/playback.md). They share one routing: while one
@@ -132,8 +167,15 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Video mode (the full player's Song/Video toggle). Casting turns it off.
   final videoMode = ValueNotifier(false);
 
-  /// Emits a song that has no music video, when video mode had to fall back to the song.
-  final noVideo = StreamController<SongItem>.broadcast();
+  /// Toasts for the app to show.
+  final notices = StreamController<PlayerNotice>.broadcast();
+
+  /// Songs whose music video couldn't be played this session; their Video toggle is disabled.
+  final videoUnavailable = ValueNotifier<Set<String>>(const {});
+
+  /// The current song when neither it nor its music video can be played: the session stays in the
+  /// error state (Play reloads) until another load starts.
+  String? _unplayableId;
 
   /// The output's key for the loaded song; its status updates carry it.
   String? _remoteUrl;
@@ -161,7 +203,10 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// Turns video mode on or off; the song continues from the same position.
   void setVideoMode(bool on) {
-    if (videoMode.value == on || (on && (casting || _video == null))) return;
+    if (videoMode.value == on) return;
+    if (on && (casting || _video == null || videoUnavailable.value.contains(queueState.value.current?.videoId))) {
+      return;
+    }
     videoMode.value = on;
     _syncOutput();
   }
@@ -169,6 +214,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   bool get casting => _cast?.status.value.connected ?? false;
 
   bool get _remoteActive => _output != null;
+
+  /// Video mode is the active output.
+  bool get _videoActive => _output != null && identical(_output, _video);
 
   /// The lock screen player's Like button (`customAction('toggleLike')`); set by the app.
   Future<void> Function()? onToggleLike;
@@ -229,6 +277,12 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Serializes changes to the preloaded next song (see [_syncPreloaded]).
   Future<void> _preloadOp = Future.value();
   Timer? _preloadRetry;
+
+  /// The upcoming song preloading failed for, and how many times. After [_preloadAttempts] (at once
+  /// when it's unavailable) it's left to load when it's reached.
+  String? _preloadFailedId;
+  int _preloadFailures = 0;
+  static const _preloadAttempts = 4;
 
   /// The last native playlist edit ([_edit]); `setAudioSource` waits for it.
   Future<void> _edits = Future.value();
@@ -413,7 +467,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       _retryTimer?.cancel();
       _retries = 0;
       _recovering = false;
+      _preloadFailedId = null;
     }
+    _unplayableId = null;
     _lastPosition = position ?? Duration.zero;
     final song = s.songs[index];
     _publish(s.copyWith(index: index));
@@ -445,8 +501,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     try {
       final local = await localFile?.call(song.videoId);
       if (gen != _loadGeneration) return;
-      _loadSegments(song.videoId, gen);
-      final loader = segmentLoader;
+      _loadSegments(_source.fallbackFor(song.videoId) ?? song.videoId);
       if (_remoteActive) {
         _remoteUrl = null;
         _remote = null;
@@ -460,10 +515,16 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
             position: position ?? Duration.zero,
             autoplay: autoplay,
           );
-        } on NoVideoException {
-          if (gen != _loadGeneration || !identical(output, _video)) return;
-          // No music video for this song: carry on with the song itself.
-          noVideo.add(song);
+        } catch (e) {
+          final unavailable = PlayableSource.isUnavailable(e);
+          if ((e is! NoVideoException && !unavailable) || !identical(output, _video)) rethrow;
+          if (gen != _loadGeneration) return;
+          // No music video for this song, or one that can't be played: carry on with the song itself.
+          if (e is StreamResolveException) {
+            errorLog.add('video', '${e.code}: ${e.message}', detail: _describe(song.videoId));
+            videoUnavailable.value = {...videoUnavailable.value, song.videoId};
+          }
+          notices.add(unavailable ? PlayerNotice.videoUnavailable : PlayerNotice.noVideo);
           videoMode.value = false;
           _output = null;
           unawaited(_video?.release());
@@ -472,14 +533,10 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         }
         if (gen != _loadGeneration) return;
         _remoteUrl = url;
+        _recovering = false;
+        // Video mode skips by the video's own segments.
         final videoId = _video?.currentVideoId;
-        if (identical(output, _video) && loader != null && videoId != null && videoId != song.videoId) {
-          unawaited(
-            loader(videoId).then((segs) {
-              if (gen == _loadGeneration) _segments = segs;
-            }, onError: (_) {}),
-          );
-        }
+        if (identical(output, _video) && videoId != null) _loadSegments(videoId);
         return;
       }
       // The song is already preloaded behind the current one: move on to it without reloading.
@@ -492,9 +549,21 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       if (local != null) {
         source = AudioSource.file(local, tag: song.videoId);
       } else {
-        final stream = await _resolver.resolve(song.videoId, forceRefresh: forceRefresh);
+        final known = _source.fallbackFor(song.videoId);
+        final (stream, playedId) = await _source.audioFor(song, forceRefresh: forceRefresh);
         if (gen != _loadGeneration) return;
-        source = AudioSource.uri(Uri.parse(stream.url), tag: song.videoId);
+        if (playedId != song.videoId && known == null) {
+          errorLog.add(
+            'play',
+            "Song unavailable; playing its music video's audio ($playedId)",
+            detail: _describe(song.videoId),
+          );
+          // SponsorBlock: the video's own segments (music videos often have non-music intros).
+          _loadSegments(playedId);
+        }
+        final uri = await _playbackUri(stream);
+        if (gen != _loadGeneration) return;
+        source = AudioSource.uri(uri, tag: song.videoId);
       }
       // A retry starts from a fresh native player: stop() releases it. A failed player can be left
       // with a stale load reply ("Reply already submitted") that fails every later load otherwise.
@@ -528,11 +597,31 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         detail: _describe(song.videoId),
         stack: e is StreamResolveException || e is PlayerException ? null : st,
       );
-      if (!_remoteActive && wanted && _canRetry(e)) {
+      if ((!_remoteActive || _videoActive) && wanted && _canRetry(e)) {
         _recover(index, position ?? Duration.zero);
         return;
       }
+      if (PlayableSource.isUnavailable(e)) {
+        // Neither the song nor its music video plays. Release the song the player may still hold, so
+        // Play can't resume it under this song's title; Play reloads instead.
+        _unplayableId = song.videoId;
+        notices.add(PlayerNotice.songUnavailable);
+        _showError("This song isn't available");
+        if (!_remoteActive) unawaited(_player.stop());
+        return;
+      }
       _showError(e is StreamResolveException ? e.message : '$e');
+    }
+  }
+
+  /// Plays a stream through the loopback proxy (docs/streaming.md): googlevideo throttles the
+  /// player's own single request. Straight from googlevideo if the proxy can't start.
+  Future<Uri> _playbackUri(AudioStreamInfo stream) async {
+    try {
+      return await PlaybackProxy.uriFor(stream);
+    } catch (e) {
+      errorLog.add('play', 'Playback proxy unavailable: $e');
+      return Uri.parse(stream.url);
     }
   }
 
@@ -612,13 +701,18 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
-  void _loadSegments(String videoId, int gen) {
+  /// Loads the SponsorBlock segments of [videoId], unless they're already loaded or loading: the same
+  /// song again (a retry, repeat-one), or the move to a preloaded song, which both [_loadIndex] and
+  /// [_onPlayerIndex] report.
+  void _loadSegments(String videoId) {
+    if (videoId == _segmentsFor) return;
     _segments = const [];
+    _segmentsFor = videoId;
     final loader = segmentLoader;
     if (loader == null) return;
     unawaited(
       loader(videoId).then((segs) {
-        if (gen == _loadGeneration) _segments = segs;
+        if (_segmentsFor == videoId) _segments = segs;
       }, onError: (_) {}),
     );
   }
@@ -643,13 +737,24 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     _preloadRetry?.cancel();
     _preloadOp = _preloadOp.then((_) => _doSyncPreloaded()).catchError((Object e) {
       final upcoming = _upcomingIndex();
-      errorLog.add(
-        'preload',
-        e is StreamResolveException ? '${e.code}: ${e.message}' : e,
-        detail: upcoming == null ? null : _describe(_videoIdAt(upcoming)),
-      );
-      // Try again later (e.g. once there's signal again); if the current song ends first,
-      // _onCompleted loads the next one fresh.
+      final id = upcoming == null ? null : _videoIdAt(upcoming);
+      if (id != _preloadFailedId) {
+        _preloadFailedId = id;
+        _preloadFailures = 0;
+      }
+      // Logged for the record, but never shown: the song is loaded fresh when it's reached
+      // (_onCompleted), and only that load reports a failure to the user.
+      errorLog.add('preload', e is StreamResolveException ? '${e.code}: ${e.message}' : e, detail: _describe(id));
+      // An unavailable song (its music video was tried too) won't preload on a retry. Anything else,
+      // e.g. no signal, is tried a few more times.
+      final unavailable = PlayableSource.isUnavailable(e);
+      _preloadFailures = unavailable ? _preloadAttempts : _preloadFailures + 1;
+      if (_preloadFailures >= _preloadAttempts) {
+        if (!unavailable) {
+          errorLog.add('preload', "Gave up preloading; it loads when it's reached", detail: _describe(id));
+        }
+        return;
+      }
       final gen = _loadGeneration;
       _preloadRetry = Timer(const Duration(seconds: 20), () {
         if (gen == _loadGeneration) _syncPreloaded();
@@ -676,13 +781,19 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
       final n = _player.sequence.length;
       if (n > 1) await _player.removeAudioSourceRange(1, n);
     });
-    if (!cleared || want == null) return;
+    // Gave up on this one: it loads when it's reached.
+    if (!cleared || want == null || (want == _preloadFailedId && _preloadFailures >= _preloadAttempts)) return;
     final local = await localFile?.call(want);
     final AudioSource source;
     if (local != null) {
       source = AudioSource.file(local, tag: want);
     } else {
-      source = AudioSource.uri(Uri.parse((await _resolver.resolve(want)).url), tag: want);
+      final known = _source.fallbackFor(want);
+      final (stream, playedId) = await _source.audioFor(queueState.value.songs[upcoming!]);
+      if (playedId != want && known == null) {
+        errorLog.add('preload', "Song unavailable; using its music video's audio ($playedId)", detail: _describe(want));
+      }
+      source = AudioSource.uri(await _playbackUri(stream), tag: want);
     }
     await _edit(gen, () async {
       final upcomingNow = _upcomingIndex();
@@ -722,6 +833,13 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     if (i == null || i == 0 || _remoteActive || _switching) return;
     final seq = _player.sequence;
     if (i >= seq.length) return;
+    // just_audio repeats the index with every playback event until the song moved from is dropped
+    // from the playlist: handle the move once, then only see that the drop happens.
+    if (identical(seq[i], _movedTo)) {
+      _syncPreloaded();
+      return;
+    }
+    _movedTo = seq[i];
     final id = seq[i].tag as String?;
     final s = queueState.value;
     final upcoming = _upcomingIndex();
@@ -731,14 +849,17 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         ? upcoming
         : s.songs.indexWhere((song) => song.videoId == id);
     if (index < 0) return;
-    final gen = ++_loadGeneration;
+    // A newer song: loads, preloads and retries of the one before are stale now.
+    ++_loadGeneration;
     _retryTimer?.cancel();
     _recovering = false;
+    _unplayableId = null;
+    _preloadFailedId = null;
     _lastPosition = Duration.zero;
     final song = s.songs[index];
     _publish(s.copyWith(index: index));
     mediaItem.add(_nowPlaying(song).copyWith(duration: _player.duration ?? song.duration));
-    _loadSegments(song.videoId, gen);
+    _loadSegments(_source.fallbackFor(song.videoId) ?? song.videoId);
     unawaited(_maybeExtend());
     _syncPreloaded();
     // The player's own event came before the queue followed it; publish the new song's state.
@@ -807,7 +928,7 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     if (_remoteActive || _settingSource || _switching || (_retryTimer?.isActive ?? false)) return;
     final s = queueState.value;
     final current = s.current;
-    if (current == null) return;
+    if (current == null || _unplayableId == current.videoId) return;
     final seq = _player.sequence;
     final i = e.index;
     final failedId = i != null && i < seq.length ? seq[i].tag as String? : current.videoId;
@@ -824,10 +945,27 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   void _broadcastState(PlaybackEvent? _) {
     // While recovering, show the song as still playing (buffering), so a paused look doesn't
     // suggest it stopped for good.
-    final recovering = _recovering && !_remoteActive;
+    final recovering = _recovering && (!_remoteActive || _videoActive);
     final playing = _isPlaying || recovering;
     final remote = _remoteActive ? _remote : null;
     final s = queueState.value;
+    final processingState = recovering
+        ? AudioProcessingState.buffering
+        : _remoteActive
+        ? (remote?.processingState ?? playbackState.value.processingState)
+        : _switching
+        ? AudioProcessingState.loading
+        : (_unplayableId != null && _unplayableId == s.current?.videoId) ||
+              (playbackState.value.processingState == AudioProcessingState.error &&
+                  _player.processingState == ProcessingState.idle)
+        ? AudioProcessingState.error
+        : const {
+            ProcessingState.idle: AudioProcessingState.idle,
+            ProcessingState.loading: AudioProcessingState.loading,
+            ProcessingState.buffering: AudioProcessingState.buffering,
+            ProcessingState.ready: AudioProcessingState.ready,
+            ProcessingState.completed: AudioProcessingState.completed,
+          }[_player.processingState]!;
     playbackState.add(
       playbackState.value.copyWith(
         controls: [
@@ -837,22 +975,9 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         ],
         systemActions: const {MediaAction.seek, MediaAction.seekForward, MediaAction.seekBackward},
         androidCompactActionIndices: const [0, 1, 2],
-        processingState: _remoteActive
-            ? (remote?.processingState ?? playbackState.value.processingState)
-            : _switching
-            ? AudioProcessingState.loading
-            : recovering
-            ? AudioProcessingState.buffering
-            : playbackState.value.processingState == AudioProcessingState.error &&
-                  _player.processingState == ProcessingState.idle
-            ? AudioProcessingState.error
-            : const {
-                ProcessingState.idle: AudioProcessingState.idle,
-                ProcessingState.loading: AudioProcessingState.loading,
-                ProcessingState.buffering: AudioProcessingState.buffering,
-                ProcessingState.ready: AudioProcessingState.ready,
-                ProcessingState.completed: AudioProcessingState.completed,
-              }[_player.processingState]!,
+        processingState: processingState,
+        // copyWith keeps the old message otherwise, and the session would still carry it while playing.
+        errorMessage: processingState == AudioProcessingState.error ? playbackState.value.errorMessage : null,
         playing: playing,
         updatePosition: position,
         bufferedPosition: _remoteActive
@@ -917,13 +1042,24 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
   void _onRemotePlayer(RemotePlayer p) {
     if (_output == null || p.url == null || p.url != _remoteUrl) return;
     final wasFinished = _remote?.finished ?? false;
+    final wasFailed = _remote?.failed ?? false;
     _remote = p;
-    _remotePosition = p.position;
-    _remotePositions.add(p.position);
+    // A failed player reports 0:00; keep where the song was, to resume there.
+    if (!p.failed) {
+      _remotePosition = p.position;
+      _remotePositions.add(p.position);
+      if (_retries > 0 && !_recovering && p.position > _retryFrom + const Duration(seconds: 20)) _retries = 0;
+    }
     final item = mediaItem.value;
     if (item != null && item.duration == null && p.duration != null) mediaItem.add(item.copyWith(duration: p.duration));
     _broadcastState(null);
     if (p.finished && !wasFinished) _onCompleted();
+    // Video mode lost its stream (no signal, an expired URL): reload it like the phone's player does.
+    if (p.failed && !wasFailed && _videoActive && !_recovering) {
+      final s = queueState.value;
+      errorLog.add('video', 'Playback failed', detail: _describe(s.current?.videoId));
+      _recover(s.index, _remotePosition);
+    }
   }
 
   @override
@@ -980,10 +1116,18 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
     }
     // After an error, or a player that failed and went idle, or while waiting to retry: load again
     // now, from where the song was.
-    if (queueState.value.current != null &&
+    final current = queueState.value.current;
+    if (current != null &&
         (_recovering ||
             playbackState.value.processingState == AudioProcessingState.error ||
             _player.processingState == ProcessingState.idle)) {
+      // Reloading after an error is a fresh attempt: the song's own stream first, and its video again.
+      if (playbackState.value.processingState == AudioProcessingState.error) {
+        _source.forget(current.videoId);
+        if (videoUnavailable.value.contains(current.videoId)) {
+          videoUnavailable.value = {...videoUnavailable.value}..remove(current.videoId);
+        }
+      }
       return _loadIndex(queueState.value.index, position: _lastPosition, forceRefresh: true);
     }
     return _player.play();
@@ -991,7 +1135,14 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> pause() async {
-    if (_remoteActive) return _output!.pause();
+    if (_remoteActive) {
+      if (_recovering) {
+        _retryTimer?.cancel();
+        _recovering = false;
+        _broadcastState(null);
+      }
+      return _output!.pause();
+    }
     if (_switching) {
       _switchAutoplay = false;
       _broadcastState(null);

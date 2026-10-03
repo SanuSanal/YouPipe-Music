@@ -9,7 +9,7 @@ Nothing here is secret. There are no API keys in the app. The YouTube calls are 
 | Service | Host | Used for | Auth | Code |
 |---|---|---|---|---|
 | YouTube Music InnerTube | `music.youtube.com/youtubei/v1` | Browse, search, queue, lyrics, account and library sync | None, or the Google session cookie | `lib/innertube/` |
-| YouTube streams (NewPipeExtractor) | `youtube.com`, `googlevideo.com` | Playable audio/video URLs, downloads | None | `StreamExtractorChannel.kt`, `DownloadChannel.kt` |
+| YouTube streams (NewPipeExtractor) | `youtube.com`, `googlevideo.com` | Playable audio/video URLs, playback, downloads | None | `StreamExtractorChannel.kt`, `PlaybackProxy.kt`, `DownloadChannel.kt` |
 | Google sign-in | `accounts.google.com` | The user signs in inside a WebView | The user's own credentials | `lib/features/settings/login_screen.dart` |
 | Image CDNs | `*.googleusercontent.com`, `i.ytimg.com` | Cover art and thumbnails | None | `lib/innertube/models.dart` (`Thumbnail`) |
 | LRCLIB | `lrclib.net/api` | Synced lyrics | None | `lib/data/lyrics/lyrics_service.dart` |
@@ -65,7 +65,7 @@ These are only added when the stored cookie contains `SAPISID` or `__Secure-3PAP
 | `playlist(id)` | `browse` | `browseId: VL<playlistId>` | no |
 | `lyrics(ep)` / `related(ep)` | `browse` | `browseId: MPLY…` / `MPTR…` (taken from the `next` response tabs) | no |
 | `sectionsContinuation`, `playlistContinuation` | `browse` | `continuation` | no |
-| `search(q, filter)` | `search` | `query`, `params` (filter blob from `SearchFilter`) | no |
+| `search(q, filter)` | `search` | `query`, `params` (filter blob from `SearchFilter`). A Videos search also finds a song's music video, for video mode and for playing an unavailable song's audio | no |
 | `searchContinuation` | `search` | `continuation` | no |
 | `searchSuggestions(input)` | `music/get_search_suggestions` | `input` | no |
 | `next(ep)` | `next` | `videoId`, `playlistId`, `params`, `index`, `isAudioOnly: true`, `enablePersistentPlaylistPanel: true`, `tunerSettingValue: AUTOMIX_SETTING_NORMAL` | no |
@@ -96,7 +96,7 @@ These are only added when the stored cookie contains `SAPISID` or `__Secure-3PAP
 The app does **not** use InnerTube `/player`. Without a PO token, its URLs stop at about 1 MB. Playable URLs come from [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) (`com.github.TeamNewPipe:NewPipeExtractor:v0.26.5` from JitPack, set in `android/app/build.gradle.kts`). It runs in Kotlin with its own OkHttp downloader and calls YouTube for `https://www.youtube.com/watch?v=<videoId>`. Details are in [streaming.md](streaming.md).
 
 - **The resulting googlevideo URLs** carry `ip=` (the phone's IP), `c=` (the client that produced them) and `expire=`. They only work from the same IP, with a User-Agent that matches `c=`.
-- **Downloads and the cast relay** fetch them in 1 MB `Range` chunks (`Googlevideo.kt`).
+- **Phone playback, downloads and the cast relay** fetch them in 1 MB `Range` chunks (`Googlevideo.kt`). Phone playback goes through `PlaybackProxy.kt` on 127.0.0.1, because googlevideo throttles the player's own single open-ended request (see streaming.md).
 
 ## Google sign-in
 
@@ -149,6 +149,7 @@ These are internal APIs between Flutter and `android/app/src/main/kotlin/com/you
 | Channel | Methods (arguments → result) | Kotlin |
 |---|---|---|
 | `youpipe/stream_extractor` | `getAudioStreams({videoId, hl, gl})` → `{videoId, durationSeconds, streams: [{url, itag, mimeType, codec, bitrate, contentLength}]}`; `getVideoStream({videoId, hl, gl})` → `{url, height, mimeType, userAgent, durationSeconds}`; `getVideoManifest({videoId, hl, gl, maxHeight, onlyBest})` → `{mpd, height, userAgent, durationSeconds}`. Error codes are listed in [streaming.md](streaming.md). | `StreamExtractorChannel.kt` |
+| `youpipe/playback_proxy` | `url({url, mimeType, contentLength})` → `http://127.0.0.1:<port>/s/<token>`, which serves that googlevideo URL to the phone's player | `PlaybackProxy.kt` |
 | `youpipe/downloader` | `download({id, url, path})` → int; `cancel({id})` | `DownloadChannel.kt` |
 | `youpipe/downloader/progress` (events) | `{id, downloaded, total}` | `DownloadChannel.kt` |
 | `youpipe/cookies` | `get({url})` → cookie string; `clear()` | `CookieChannel.kt` |

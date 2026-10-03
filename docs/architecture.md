@@ -29,7 +29,7 @@ Local data: drift SQLite (lib/data/db), SharedPreferences (settings), flutter_se
 | `lib/player/` | `audio_handler.dart` (queue, playback, timers); `audio_effects.dart` (equalizer and loudness); `auto_browser.dart` (Android Auto tree) |
 | `lib/ui/` | Theme tokens, router, app shell (bottom nav + player panel), shared widgets, navigation helpers |
 | `lib/features/<screen>/` | One folder per screen |
-| `android/app/src/main/kotlin/com/youpipe/music/` | Native channels: stream extraction, downloader, cookies, audio effects, updater, casting (Chromecast, and the LAN relay shared with DLNA); the lock screen player activity |
+| `android/app/src/main/kotlin/com/youpipe/music/` | Native channels: stream extraction, the loopback playback proxy, downloader, cookies, audio effects, updater, casting (Chromecast, and the LAN relay shared with DLNA); the lock screen player activity |
 | `tool/` | Fixture recording and renderer-tree inspection scripts (Python) |
 
 ## Wiring and startup
