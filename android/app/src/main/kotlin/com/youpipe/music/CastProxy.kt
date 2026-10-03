@@ -4,7 +4,6 @@ import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
-import java.io.InputStream
 import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.net.Inet4Address
@@ -109,28 +108,20 @@ object CastProxy {
     private fun serve(client: Socket) =
         client.use { socket ->
             socket.soTimeout = 30_000
-            val input = BufferedInputStream(socket.getInputStream())
+            val request = MiniHttp.readRequest(BufferedInputStream(socket.getInputStream())) ?: return
             val out = BufferedOutputStream(socket.getOutputStream(), 64 * 1024)
-            val requestLine = readLine(input) ?: return
-            val headers = HashMap<String, String>()
-            while (true) {
-                val line = readLine(input) ?: break
-                if (line.isEmpty()) break
-                val colon = line.indexOf(':')
-                if (colon > 0) headers[line.substring(0, colon).trim().lowercase()] = line.substring(colon + 1).trim()
-            }
-            val (method, path) = requestLine.split(' ').let { it.getOrNull(0) to it.getOrNull(1) }
-            val token = path?.takeIf { it.startsWith("/a/") }?.removePrefix("/a/")?.substringBefore('?')
+            val method = request.method
+            val token = request.path?.takeIf { it.startsWith("/a/") }?.removePrefix("/a/")?.substringBefore('?')
             val source = synchronized(this) { token?.let { sources[it] } }
             if (source == null || (method != "GET" && method != "HEAD")) {
-                writeHead(out, 404, "Not Found", emptyMap())
+                MiniHttp.writeHead(out, 404, "Not Found", emptyMap())
                 out.flush()
                 return
             }
             val head = method == "HEAD"
             when (source) {
-                is Source.Local -> serveFile(source.file, headers["range"], head, out)
-                is Source.Remote -> serveRemote(token!!, source.videoId, headers["range"], head, out)
+                is Source.Local -> serveFile(source.file, request.headers["range"], head, out)
+                is Source.Remote -> serveRemote(token!!, source.videoId, request.headers["range"], head, out)
             }
             out.flush()
         }
@@ -142,7 +133,7 @@ object CastProxy {
         out: OutputStream,
     ) {
         val size = file.length()
-        val (start, end) = parseRange(rangeHeader, size)
+        val (start, end) = MiniHttp.parseRange(rangeHeader, size)
         writeRangeHead(out, rangeHeader != null, start, end, size, mimeOf(file))
         if (head) return
         RandomAccessFile(file, "r").use { raf ->
@@ -166,7 +157,7 @@ object CastProxy {
         out: OutputStream,
     ) {
         var stream = streamFor(token, videoId, refresh = false)
-        val (start, end) = parseRange(rangeHeader, stream.size)
+        val (start, end) = MiniHttp.parseRange(rangeHeader, stream.size)
         writeRangeHead(out, rangeHeader != null, start, end, stream.size, stream.mime)
         if (head) return
         var offset = start
@@ -182,7 +173,7 @@ object CastProxy {
                 }
                 if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
                 val body = response.body?.byteStream() ?: throw IllegalStateException("Empty body")
-                offset += copy(body, out)
+                offset += MiniHttp.copy(body, out)
             }
         }
     }
@@ -212,35 +203,6 @@ object CastProxy {
         return stream
     }
 
-    private fun copy(
-        input: InputStream,
-        out: OutputStream,
-    ): Long {
-        val buffer = ByteArray(64 * 1024)
-        var total = 0L
-        while (true) {
-            val n = input.read(buffer)
-            if (n < 0) break
-            out.write(buffer, 0, n)
-            total += n
-        }
-        return total
-    }
-
-    /** A single `bytes=a-b` / `bytes=a-` range, clamped to the file; the whole file without one. */
-    private fun parseRange(
-        header: String?,
-        size: Long,
-    ): Pair<Long, Long> {
-        val spec = header?.removePrefix("bytes=")?.substringBefore(',') ?: return 0L to size - 1
-        val start = spec.substringBefore('-').toLongOrNull()
-        val end = spec.substringAfter('-').toLongOrNull()
-        return when {
-            start == null && end != null -> maxOf(0, size - end) to size - 1
-            else -> (start ?: 0L).coerceIn(0, size - 1) to minOf(end ?: (size - 1), size - 1)
-        }
-    }
-
     private fun writeRangeHead(
         out: OutputStream,
         partial: Boolean,
@@ -259,33 +221,10 @@ object CastProxy {
                 put("contentFeatures.dlna.org", DLNA_FEATURES)
                 put("transferMode.dlna.org", "Streaming")
             }
-        if (partial) writeHead(out, 206, "Partial Content", headers) else writeHead(out, 200, "OK", headers)
-    }
-
-    private fun writeHead(
-        out: OutputStream,
-        code: Int,
-        reason: String,
-        headers: Map<String, String>,
-    ) {
-        val text =
-            buildString {
-                append("HTTP/1.1 $code $reason\r\n")
-                headers.forEach { (k, v) -> append("$k: $v\r\n") }
-                append("Access-Control-Allow-Origin: *\r\n")
-                append("Connection: close\r\n\r\n")
-            }
-        out.write(text.toByteArray(Charsets.ISO_8859_1))
-    }
-
-    private fun readLine(input: InputStream): String? {
-        val line = StringBuilder()
-        while (true) {
-            val c = input.read()
-            if (c < 0) return if (line.isEmpty()) null else line.toString()
-            if (c == '\n'.code) return line.toString().trimEnd('\r')
-            line.append(c.toChar())
-            if (line.length > 8192) return null
+        if (partial) {
+            MiniHttp.writeHead(out, 206, "Partial Content", headers)
+        } else {
+            MiniHttp.writeHead(out, 200, "OK", headers)
         }
     }
 

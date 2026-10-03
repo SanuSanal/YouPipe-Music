@@ -480,7 +480,18 @@ final videoOutputProvider = Provider<VideoOutput>((ref) {
     quality: () => ref.read(settingsProvider).videoQuality,
   );
   handler.video = video;
+  // An unavailable song plays its music video's audio (docs/playback.md).
+  handler.findMusicVideo = finder.find;
   return video;
+});
+
+/// Songs whose music video couldn't be played; their Video toggle is disabled.
+final videoUnavailableProvider = Provider<Set<String>>((ref) {
+  final ids = ref.watch(audioHandlerProvider).videoUnavailable;
+  void changed() => ref.invalidateSelf();
+  ids.addListener(changed);
+  ref.onDispose(() => ids.removeListener(changed));
+  return ids.value;
 });
 
 final videoModeProvider = Provider<bool>((ref) {

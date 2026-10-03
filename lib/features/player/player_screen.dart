@@ -174,8 +174,8 @@ class PlayerScreen extends ConsumerWidget {
   }
 }
 
-/// Song / Video, as in YouTube Music. Video is offered when the song has a music video and
-/// nothing is being cast (docs/playback.md).
+/// Song / Video, as in YouTube Music. Video is offered when the song has a music video that plays
+/// and nothing is being cast (docs/playback.md).
 class _SongVideoToggle extends ConsumerWidget {
   const _SongVideoToggle({required this.song});
 
@@ -187,7 +187,8 @@ class _SongVideoToggle extends ConsumerWidget {
     final videoMode = ref.watch(videoModeProvider);
     final casting = ref.watch(castStatusProvider).connected;
     final hasVideo = ref.watch(musicVideoProvider(song.videoId)).value != null;
-    final canVideo = videoMode || (hasVideo && !casting);
+    final videoUnavailable = ref.watch(videoUnavailableProvider).contains(song.videoId);
+    final canVideo = videoMode || (hasVideo && !casting && !videoUnavailable);
 
     Widget seg(String label, {required bool selected, required bool enabled, required VoidCallback onTap}) => InkWell(
       onTap: enabled && !selected ? onTap : null,
@@ -423,6 +424,8 @@ class _Controls extends ConsumerWidget {
     final busy =
         state?.processingState == AudioProcessingState.loading ||
         state?.processingState == AudioProcessingState.buffering;
+    // After a failure Play reloads the song, so it shows as Reload.
+    final failed = state?.processingState == AudioProcessingState.error;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -449,7 +452,14 @@ class _Controls extends ConsumerWidget {
                     height: 30,
                     child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3),
                   )
-                : Icon(playing ? Icons.pause : Icons.play_arrow, size: 44),
+                : Icon(
+                    failed
+                        ? Icons.refresh
+                        : playing
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    size: 44,
+                  ),
           ),
         ),
         IconButton(iconSize: 40, icon: const Icon(Icons.skip_next), onPressed: handler.skipToNext),

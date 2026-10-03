@@ -61,6 +61,7 @@ Request bodies, headers and ID prefixes for every endpoint are listed in [apis.m
   - otherwise it runs a **Videos search** for `"<title> <first artist>"`;
   - `pickMusicVideo` (`innertube/music_video.dart`) takes the first video whose title contains the song title (brackets stripped from the inside out, e.g. `[… (TM) …]`) and that shares an artist, or names one in its title.
 - It's a heuristic: it can miss, and it can pick a live or lyric video. `MusicVideoFinder` (providers.dart) caches the answer per song.
+- The player also uses it to play an unavailable song's audio (playback.md, "Unavailable songs").
 - Without a segment map, song and video positions aren't aligned. Switching keeps the same timestamp.
 
 ## Fixtures

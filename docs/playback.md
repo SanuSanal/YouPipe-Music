@@ -15,8 +15,14 @@
   - **Playlist edits go through `_edit` (fixed 2026-10-01).** Each `removeAudioSourceRange`/`addAudioSource` runs after the previous edit, and only while the same load is current and the player is settled: not loading, not idle or failed, not switching or recovering. `_loadIndex` waits for an in-flight edit (`_edits`) before `setAudioSource`.
     - **Why:** an edit that landed while a failed song was being reloaded left just_audio 0.10.6's Android player with a stale load reply. Its `sendError` throws "Reply already submitted" before clearing `prepareResult`, so every later load failed until the app restarted. Seen once in a scripted run of rapid skips, after a `Source error`.
     - **Safety net:** a retry starts with `_player.stop()`, which releases the native player, so the next load gets a fresh one even if it wedges anyway.
-  - When preloading fails (for example with no signal), it's logged and tried again every 20 s for as long as the same song plays.
+  - **When preloading fails** (changed 2026-10-03), it's logged in the Error log (`preload`) but never shown to the user.
+    - An unavailable song is given up at once, since its music video was already tried.
+    - Anything else (no signal, for example) is tried again every 20 s, at most 4 attempts in all, then a "Gave up preloading" entry is logged.
+    - A song given up on isn't preloaded again while the current song plays. When it's reached, `_onCompleted` loads it fresh (`_loadNext`), and only that load reports a failure.
+    - **Why:** before this, an unavailable next song was logged and re-extracted every 20 s for the whole current song (17 entries for one song).
   - `_onPlayerIndex` (on `currentIndexStream`) handles the automatic move: it publishes the new queue index, media item and SponsorBlock segments, then preloads the one after.
+    - **just_audio repeats the index with every playback event** (about every 500 ms), not only when it changes. So the move is handled once per playlist entry (`_movedTo`); repeats only run `_syncPreloaded` until the song moved from is dropped.
+    - **SponsorBlock loads once per video id** (`_segmentsFor`), and `SponsorBlockService` shares an in-flight request. Before, a move to a preloaded song sent the same request three times.
   - Skipping to the preloaded song (Next, SponsorBlock ending a song, tapping it in Up next) uses `seekToNext()` in place of a reload.
   - Cast and video mode don't preload; their `_loadIndex` path is unchanged.
 - **Stale-load guard:** `_loadGeneration` makes sure a slow load can't override a newer choice.
@@ -32,11 +38,25 @@
   - **Where errors arrive:** just_audio 0.10 reports player errors on `errorStream`, not as errors on `playbackEventStream`. The old `onError` hook never fired, so nothing recovered.
   - **Retrying:** a player error, or a failed load that can be retried, calls `_recover`. It clears **every** cached stream URL (they're bound to the phone's IP, which usually changes after a loss of signal), then reloads the song with a fresh URL from `_lastPosition`. The first retry is immediate, then after 2, 5, 10, 20 and 30 s (`_retryDelays`, about 3.5 minutes in all). After that it shows the error state ("Can't play this song").
   - **While retrying,** the session reports `buffering` and playing, so the car and notification don't look stopped. Pause cancels the retries; Play (also from the error or idle state) retries at once.
-  - **Not retried:** `AGE_RESTRICTED`, `GEO_RESTRICTED`, `UNAVAILABLE` and `NO_STREAMS` go straight to the error state.
+  - **Not retried:** `AGE_RESTRICTED`, `GEO_RESTRICTED`, `UNAVAILABLE` and `NO_STREAMS` (`PlayableSource.isUnavailable`) aren't retried; see "Unavailable songs" below.
   - **The retry count** resets after 20 s of playback past the recovery point.
   - **No double counting:** `_settingSource` and the pending retry timer stop one failure being handled twice (by `_loadIndex`'s catch and by `errorStream`).
   - **A preloaded next song that fails** as the player reaches it is recovered as that song, from 0:00.
-- **Buffer:** `AndroidLoadControl` buffers 3–5 minutes ahead instead of ExoPlayer's 50 s. That's a few MB at 160 kbps, and short losses of signal pass unnoticed. In the test, 40 s without Wi-Fi played through, including the move into the preloaded next song.
+- **Unavailable songs (added 2026-10-03):**
+  - **Why:** YouTube blocks some "song" (ATV) uploads for anonymous clients, for example several Malayalam film songs. Every client returns `UNPLAYABLE` "This video is not available" (see streaming.md), while a video upload of the same song plays.
+  - **Fallback to the video's audio:** `PlayableSource` (`lib/player/playable_source.dart`, unit-tested) resolves the stream for both `_loadIndex` and preloading.
+    - When the song is unavailable, it looks up the music video (`findMusicVideo`, which is `MusicVideoFinder.find`, the same search video mode uses; see innertube.md) and plays that video's audio in Song mode.
+    - The fallback is remembered per song for the session. The player's tag stays the song's id, so the queue logic is unchanged. SponsorBlock loads the video's segments.
+    - One `play` (or `preload`) entry in the Error log names the video used.
+  - **Neither plays:**
+    - The `songUnavailable` notice shows the toast "This song isn't available".
+    - The session reports `error` ("This song isn't available") and stays there while `_unplayableId` is the current song. That holds even when the player still holds the previous song, which is released with `stop()`, so Play can never resume the old song under the new title.
+    - The play buttons show as **Reload**. Play in the error state forgets the song's fallback and its unavailable video, then loads it again from scratch.
+    - An automatic advance stops on such a song too; it isn't skipped.
+  - **The error message is cleared** (`errorMessage: null`) once the session leaves the error state. audio_service's `copyWith` keeps it otherwise, and the media session went on reporting "isn't available" while the next song played.
+- **Buffer:** `AndroidLoadControl` buffers 3–5 minutes ahead instead of ExoPlayer's 50 s. That's a few MB at 160 kbps, and short losses of signal pass unnoticed.
+  - **It only fills since the playback proxy (fixed 2026-10-03).** Before, googlevideo throttled the player's request and the buffer stayed about 50 s ahead (see streaming.md). Now a song is buffered within seconds, up to about 5.5 minutes ahead.
+  - **Tested 2026-10-03:** seeking 49 minutes into a long track with no network failed with the proxy's 502. The retries resumed at the same position once Wi-Fi was back.
 - **Swiping the app away** from recent apps stops playback, the notification and the service (`onTaskRemoved` → `stop()`). audio_service's default does nothing, so before this the music kept playing with the app gone. Reopening the app and pressing play starts the song again.
 - **Completion:** repeat-one replays; otherwise the next song plays; with repeat-all at the end it wraps; otherwise it stops at 0. When the next song wasn't preloaded (for example because preloading failed), it's loaded with a fresh URL (`_loadNext`).
 - **Error log:** failures (player, load, preload, radio, video, download, cast, uncaught) go to the in-memory `errorLog` (`lib/data/error_log.dart`, last 200 entries), which the hidden Error log page shows (see ui.md).
@@ -92,7 +112,14 @@
   - **Quality** (setting `videoQuality`): `auto` plays a local DASH manifest of the 360p–1080p video-only streams (it starts low and steps up) plus the audio, and ExoPlayer picks the height by bandwidth. `high` keeps only the tallest one up to 1080p. `dataSaver` plays the muxed 360p stream. When there's no HD (`NO_HD`, or the manifest fails to initialize) it falls back to 360p. See streaming.md.
   - Options: `allowBackgroundPlayback: true` (the video keeps playing as sound in the background, so the notification and lock screen player carry on) and `mixWithOthers: true` (no audio-focus fight with just_audio).
   - **Next / auto-advance** stay in video mode.
-  - **A song without a video** falls back to the song (`handler.noVideo`, toast "No video for this song").
+  - **Lost stream (added 2026-10-03):** when the video player fails (no signal, an expired URL), the handler recovers it like the phone's player. It uses the same `_recover` retries and delays, shows buffering meanwhile, and resumes from the last position. Pause cancels the retries.
+    - Before this, the session went to the error state, and Reload restarted the video from 0:00, because a failed player reports position 0. Failed remote updates no longer overwrite the position, so casting keeps it too.
+    - Extraction errors in `VideoOutput._open` (other than `NO_HD`) no longer fall back to 360p, since 360p would fail the same way. They reach the handler, which retries.
+    - **Tested 2026-10-03:** with Wi-Fi off, the video failed after about 50 s at 50:25 and kept retrying. Once Wi-Fi was back, it resumed in HD at 50:25.
+  - **A song without a video** falls back to the song (`PlayerNotice.noVideo`, toast "No video for this song").
+  - **A music video that can't be played** (unavailable, age- or region-restricted) also falls back to the song (`PlayerNotice.videoUnavailable`, toast "Video isn't available. Playing the song").
+    - The song goes into `handler.videoUnavailable`, which dims the Video toggle for it this session; Reload clears it.
+    - `VideoOutput._open` doesn't try 360p after an unavailable HD manifest.
   - **Casting** turns video mode off.
   - **Full screen:** see ui.md.
   - **SponsorBlock** loads segments for the video's own id.

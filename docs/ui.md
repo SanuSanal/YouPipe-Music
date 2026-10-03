@@ -43,7 +43,7 @@
   2. The expanded player collapses (`BackButtonListener`).
   3. Pages pop.
   4. Leaving a non-Home tab goes to Home, then the app exits.
-- **Toasts:** always use `showSnack` (`item_menu.dart`). Inside the shell it sets the toast's bottom margin so it floats above the mini player and nav bar (only above the system bar when the player is expanded). The shell shows "No video for this song" when video mode falls back; SponsorBlock skips are silent.
+- **Toasts:** always use `showSnack` (`item_menu.dart`). Inside the shell it sets the toast's bottom margin so it floats above the mini player and nav bar (only above the system bar when the player is expanded). The shell shows the player's `notices`: "No video for this song" or "Video isn't available. Playing the song" when video mode falls back, and "This song isn't available" when neither the song nor its video plays. Preload failures and SponsorBlock skips are silent.
 
 ## Shared widgets (`lib/ui/widgets/`)
 
@@ -59,7 +59,8 @@
 | `CollectionHeader`, `TintedPage`, `ArtworkTint` | Album/playlist header and page: artwork-tinted gradient, the top bar turns solid and shows the title after scrolling |
 | `LoadingView`, `ErrorView`, `EmptyView`, `songCount()` | Standard states and pluralisation |
 
-- **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video plays the music video in place of the artwork; it's dimmed when the song has no video or while casting; see playback.md), left-aligned Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
+- **Full player** (`features/player/`): artwork-tinted gradient, Song/Video toggle (Video plays the music video in place of the artwork; it's dimmed when the song has no video, its video can't be played, or while casting; see playback.md), left-aligned Like/Save/Share/Album pills, seek bar and controls. The **UP NEXT / LYRICS / RELATED** sheet supports drag-to-reorder and swipe-to-remove in Up next.
+- **Reload button:** in the error state, the play button in the full player, the mini player and the full-screen video shows a refresh icon, and pressing it reloads the song. The mini player's subtitle shows the error message ("This song isn't available", or "Can't play this song").
 - **Hidden Error log page** (`features/settings/error_log_screen.dart`): tap the version tile in Settings → About three times within 1.5 s. The tile uses a plain `GestureDetector`, with no ripple and no hint. The page lists this session's errors newest first (time · source · song); tapping one shows its detail and stack, with Report and Copy buttons. The toolbar has Report on GitHub, Copy all and Clear.
   - **Report on GitHub** (`githubIssueUrl` in `error_log.dart`, unit-tested) opens GitHub's "new issue" page in the browser. It's prefilled with the app version, the device (`AppInfo.device`) and the errors, newest first. Entries are dropped to keep the link under about 6,000 characters, and the body says how many were left out. The user signs in and submits on GitHub, so the app holds no token.
   - The log is in memory only and isn't mentioned on the website.
