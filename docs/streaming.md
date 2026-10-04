@@ -12,7 +12,7 @@
 
 - Kotlin `StreamExtractorChannel.kt`, method `youpipe/stream_extractor.getAudioStreams({videoId, hl, gl})`, returns `{videoId, durationSeconds, streams: [{url, itag, mimeType, codec, bitrate, contentLength}]}` (`bitrate` in **kbps**). It keeps only progressive-HTTP streams on the ORIGINAL audio track.
   - **DRC copies are dropped:** YouTube also serves "stable volume" copies of some itags (`ItagItem.isDrc()`), with compressed dynamic range and almost the same bitrate. They're only kept when nothing else is offered (`originalAudio`). This applies to playback, downloads and the cast proxy.
-  - Error codes: `AGE_RESTRICTED`, `GEO_RESTRICTED`, `UNAVAILABLE`, `RECAPTCHA`, `EXTRACTION_FAILED` (plus `NO_STREAMS` from Dart).
+  - Error codes: `AGE_RESTRICTED`, `GEO_RESTRICTED`, `UNAVAILABLE`, `RECAPTCHA`, `BOT_CHECK`, `EXTRACTION_FAILED` (plus `NO_STREAMS` from Dart). The player shows `BOT_CHECK` as "YouTube wants to confirm you're not a bot. Try again in a while" and doesn't retry it (the native side already did).
   - **`UNAVAILABLE` is YouTube's answer, not an extractor bug** (checked 2026-10-03). Some songs (e.g. nGBxfRSH6tE, beys6sH6L8U) return `playabilityStatus: UNPLAYABLE` "This video is not available" from `/player` for WEB_REMIX, IOS and ANDROID_VR alike, with gl IN or US. Bumping NewPipeExtractor won't help. A video upload of the same song usually plays, and the player falls back to it (see playback.md, "Unavailable songs").
   - It uses its own OkHttp `Downloader` and runs on a 3-thread executor.
 - `StreamResolver` (`lib/data/stream_resolver.dart`):
@@ -25,6 +25,14 @@
 - **HD video (tested 2026-09-30):** `getVideoManifest({videoId, hl, gl, maxHeight, onlyBest})` builds a static **DASH manifest** from the video-only progressive streams (H.264 preferred, VP9 when there's no H.264; one Representation per height from 360p up to `maxHeight`) plus the best non-DRC audio stream. Each Representation has its `BaseURL` and `SegmentBase` index/init byte ranges from `ItagItem`. It returns `{mpd, height, userAgent, durationSeconds}`, or `NO_HD` when there are no usable video-only streams or nothing at 480p or more.
   - `StreamResolver.resolveVideoManifest` writes the MPD to `<temp>/video/<videoId>_<quality>.mpd` and caches it until the URLs' `expire`.
   - **Why this works without a native player:** `video_player_android` sends every URI except `asset:`/`rtsp:` through `HttpVideoAsset`, whose `DefaultDataSource` wraps the header-carrying HTTP data source. So a `file://` MPD with `formatHint: VideoFormat.dash` plays in ExoPlayer, and its googlevideo requests carry the User-Agent. Re-check this when bumping `video_player`.
+
+## The bot check and the address family (`Googlevideo.kt`)
+
+- **What it is:** after heavy use, YouTube answers NewPipe's ANDROID player request with `LOGIN_REQUIRED` "Sign in to confirm that you're not a bot". It's the client NewPipe validates first, so the whole extraction fails.
+- **It's per address, and per address family.** Seen 2026-10-03 in YouPipe on the same phone: blocked over IPv6 while the PC on the same network, over IPv4, still got `OK` from ANDROID, iOS and VisionOS. Signing in doesn't help (NewPipe's mobile clients can't carry a web session), and a PO token wouldn't either (only the ANDROID/iOS requests take one, and those need device attestation).
+- **The fallback (`StreamExtractorChannel.fetchExtractor`):** on a bot check, `Googlevideo.switchFamily()` flips the shared OkHttp client's DNS order (IPv4 first, or the system's order), evicts pooled connections and retries once. The choice is remembered in the native `youpipe_network` preferences (`preferIpv4`, loaded by `Googlevideo.attach` in `MainActivity`), and flips again at the next bot check, so a flag on either family is routed around (on mobile data the shared IPv4 is often the flagged one).
+- **Everything native shares that client:** NewPipe's downloader, the playback relay (`PlaybackProxy.kt`), the cast proxy and the lock screen. Ported from YouPipe, where it fixed playback on the user's phone (2026-10-03).
+- **When both families are flagged,** the error is `BOT_CHECK`.
 
 ## Stream URLs are bound to the client
 

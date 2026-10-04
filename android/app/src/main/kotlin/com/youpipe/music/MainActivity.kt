@@ -6,6 +6,7 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        Googlevideo.attach(this)
         StreamExtractorChannel.register(flutterEngine.dartExecutor.binaryMessenger)
         PlaybackProxy.register(flutterEngine.dartExecutor.binaryMessenger)
         DownloadChannel.register(flutterEngine.dartExecutor.binaryMessenger)

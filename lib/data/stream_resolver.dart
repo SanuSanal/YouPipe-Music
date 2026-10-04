@@ -72,7 +72,10 @@ enum VideoQuality { auto, high, dataSaver }
 class StreamResolveException implements Exception {
   StreamResolveException(this.code, this.message);
 
-  /// AGE_RESTRICTED, GEO_RESTRICTED, UNAVAILABLE, RECAPTCHA, EXTRACTION_FAILED, NO_STREAMS, NO_VIDEO
+  /// AGE_RESTRICTED, GEO_RESTRICTED, UNAVAILABLE, RECAPTCHA, BOT_CHECK, EXTRACTION_FAILED, NO_STREAMS, NO_VIDEO
+  ///
+  /// BOT_CHECK: YouTube's "Sign in to confirm that you're not a bot", over both IPv4 and IPv6 (the native side
+  /// already retried over the other address family; docs/streaming.md).
   final String code;
   final String message;
 

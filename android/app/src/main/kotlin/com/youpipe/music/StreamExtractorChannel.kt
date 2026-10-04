@@ -20,6 +20,7 @@ import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.Stream
+import org.schabi.newpipe.extractor.stream.StreamExtractor
 import org.schabi.newpipe.extractor.stream.VideoStream
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -97,13 +98,15 @@ object StreamExtractorChannel {
                 mainHandler.post { result.success(data) }
             } catch (e: Throwable) {
                 val code =
-                    when (e) {
-                        is AgeRestrictedContentException -> "AGE_RESTRICTED"
-                        is GeographicRestrictionException -> "GEO_RESTRICTED"
-                        is ContentNotAvailableException -> "UNAVAILABLE"
-                        is ReCaptchaException -> "RECAPTCHA"
-                        is NoVideoException -> "NO_VIDEO"
-                        is NoHdException -> "NO_HD"
+                    when {
+                        // "Sign in to confirm that you're not a bot" over both address families (fetchExtractor).
+                        Googlevideo.isBotCheck(e) -> "BOT_CHECK"
+                        e is AgeRestrictedContentException -> "AGE_RESTRICTED"
+                        e is GeographicRestrictionException -> "GEO_RESTRICTED"
+                        e is ContentNotAvailableException -> "UNAVAILABLE"
+                        e is ReCaptchaException -> "RECAPTCHA"
+                        e is NoVideoException -> "NO_VIDEO"
+                        e is NoHdException -> "NO_HD"
                         else -> "EXTRACTION_FAILED"
                     }
                 mainHandler.post { result.error(code, e.message ?: e.javaClass.simpleName, null) }
@@ -130,8 +133,7 @@ object StreamExtractorChannel {
         gl: String,
     ): Map<String, Any?> {
         ensureInit(hl, gl)
-        val extractor = ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId")
-        extractor.fetchPage()
+        val extractor = fetchExtractor(videoId)
         val best =
             extractor.videoStreams
                 .filter { it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && it.isUrl && !it.isVideoOnly }
@@ -145,6 +147,22 @@ object StreamExtractorChannel {
             "userAgent" to Googlevideo.userAgentFor(best.content),
             "durationSeconds" to extractor.length,
         )
+    }
+
+    /**
+     * Fetches a video's player responses. YouTube flags IPv4 and IPv6 addresses separately, so after a bot check
+     * this retries once over the other address family and keeps using it ([Googlevideo.switchFamily]).
+     */
+    private fun fetchExtractor(videoId: String): StreamExtractor {
+        fun fetch() =
+            ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId").apply { fetchPage() }
+        return try {
+            fetch()
+        } catch (e: Exception) {
+            if (!Googlevideo.isBotCheck(e)) throw e
+            Googlevideo.switchFamily()
+            fetch()
+        }
     }
 
     fun ensureInit(
@@ -172,8 +190,7 @@ object StreamExtractorChannel {
         gl: String,
     ): Map<String, Any?> {
         ensureInit(hl, gl)
-        val extractor = ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId")
-        extractor.fetchPage()
+        val extractor = fetchExtractor(videoId)
 
         val streams =
             originalAudio(extractor.audioStreams)
@@ -222,8 +239,7 @@ object StreamExtractorChannel {
         onlyBest: Boolean,
     ): Map<String, Any?> {
         ensureInit(hl, gl)
-        val extractor = ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId")
-        extractor.fetchPage()
+        val extractor = fetchExtractor(videoId)
         val durationSeconds = extractor.length
         val usable =
             extractor.videoOnlyStreams

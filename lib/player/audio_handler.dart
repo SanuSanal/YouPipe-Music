@@ -610,7 +610,13 @@ class YouPipeAudioHandler extends BaseAudioHandler with SeekHandler {
         if (!_remoteActive) unawaited(_player.stop());
         return;
       }
-      _showError(e is StreamResolveException ? e.message : '$e');
+      _showError(
+        e is StreamResolveException && e.code == 'BOT_CHECK'
+            ? "YouTube wants to confirm you're not a bot. Try again in a while"
+            : e is StreamResolveException
+            ? e.message
+            : '$e',
+      );
     }
   }
 
