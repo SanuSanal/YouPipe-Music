@@ -96,7 +96,7 @@ These are only added when the stored cookie contains `SAPISID` or `__Secure-3PAP
 The app does **not** use InnerTube `/player`. Without a PO token, its URLs stop at about 1 MB. Playable URLs come from [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) (`com.github.TeamNewPipe:NewPipeExtractor:v0.26.5` from JitPack, set in `android/app/build.gradle.kts`). It runs in Kotlin with its own OkHttp downloader and calls YouTube for `https://www.youtube.com/watch?v=<videoId>`. Details are in [streaming.md](streaming.md).
 
 - **The resulting googlevideo URLs** carry `ip=` (the phone's IP), `c=` (the client that produced them) and `expire=`. They only work from the same IP, with a User-Agent that matches `c=`.
-- **Phone playback, downloads and the cast relay** fetch them in 1 MB `Range` chunks (`Googlevideo.kt`). Phone playback goes through `PlaybackProxy.kt` on 127.0.0.1, because googlevideo throttles the player's own single open-ended request (see streaming.md).
+- **Phone playback, downloads and the cast relay** fetch them in 1 MB `Range` chunks (`Googlevideo.kt`). Phone playback (songs and video mode) goes through `PlaybackProxy.kt` on 127.0.0.1, because googlevideo throttles the player's own single open-ended request, and so every fetch keeps to the address family extraction used (see streaming.md).
 
 ## Google sign-in
 
@@ -148,8 +148,8 @@ These are internal APIs between Flutter and `android/app/src/main/kotlin/com/you
 
 | Channel | Methods (arguments → result) | Kotlin |
 |---|---|---|
-| `youpipe/stream_extractor` | `getAudioStreams({videoId, hl, gl})` → `{videoId, durationSeconds, streams: [{url, itag, mimeType, codec, bitrate, contentLength}]}`; `getVideoStream({videoId, hl, gl})` → `{url, height, mimeType, userAgent, durationSeconds}`; `getVideoManifest({videoId, hl, gl, maxHeight, onlyBest})` → `{mpd, height, userAgent, durationSeconds}`. Error codes are listed in [streaming.md](streaming.md). | `StreamExtractorChannel.kt` |
-| `youpipe/playback_proxy` | `url({url, mimeType, contentLength})` → `http://127.0.0.1:<port>/s/<token>`, which serves that googlevideo URL to the phone's player | `PlaybackProxy.kt` |
+| `youpipe/stream_extractor` | `getAudioStreams({videoId, hl, gl})` → `{videoId, durationSeconds, streams: [{url, itag, mimeType, codec, bitrate, contentLength}]}`; `getVideoStream({videoId, hl, gl})` → `{url, height, mimeType, userAgent, durationSeconds}`; `getVideoManifest({videoId, hl, gl, maxHeight, onlyBest})` → `{mpd, height, userAgent, durationSeconds}`. Error codes are listed in [streaming.md](streaming.md). On YouTube's bot check, each extraction is retried once over the other address family (IPv4/IPv6), and `BOT_CHECK` means both were refused. | `StreamExtractorChannel.kt` |
+| `youpipe/playback_proxy` | `url({url, mimeType?, contentLength?})` → `http://127.0.0.1:<port>/s/<token>`, which serves that googlevideo URL to the phone's player (songs, the muxed video stream, and each stream of a relayed HD manifest) | `PlaybackProxy.kt` |
 | `youpipe/downloader` | `download({id, url, path})` → int; `cancel({id})` | `DownloadChannel.kt` |
 | `youpipe/downloader/progress` (events) | `{id, downloaded, total}` | `DownloadChannel.kt` |
 | `youpipe/cookies` | `get({url})` → cookie string; `clear()` | `CookieChannel.kt` |
