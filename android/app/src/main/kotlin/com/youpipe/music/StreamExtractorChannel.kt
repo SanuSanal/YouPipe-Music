@@ -156,11 +156,12 @@ object StreamExtractorChannel {
     private fun fetchExtractor(videoId: String): StreamExtractor {
         fun fetch() =
             ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId").apply { fetchPage() }
+        val family = Googlevideo.preferIpv4
         return try {
             fetch()
         } catch (e: Exception) {
             if (!Googlevideo.isBotCheck(e)) throw e
-            Googlevideo.switchFamily()
+            Googlevideo.switchFamily(from = family)
             fetch()
         }
     }

@@ -14,13 +14,16 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 /**
- * Serves googlevideo audio to the phone's own player (just_audio's ExoPlayer) from 127.0.0.1
- * (docs/streaming.md).
+ * Serves googlevideo streams to the phone's own players from 127.0.0.1 (docs/streaming.md): songs
+ * (just_audio's ExoPlayer) and video mode (video_player's ExoPlayer: the muxed 360p stream, and each
+ * stream of the HD manifest).
  *
  * ExoPlayer reads a stream with one open-ended request, which googlevideo throttles to about twice
  * real time, so the player's 3–5 minute buffer never filled (about 50 s ahead was measured). This
  * proxy fetches the same URL in 1 MB ranges with its client's User-Agent, like the downloader and
- * the cast relay, and those arrive at full speed: a whole song in about 2 s.
+ * the cast relay, and those arrive at full speed: a whole song in about 2 s. Going through
+ * [Googlevideo.client] also keeps playback on the address family extraction used
+ * ([Googlevideo.preferIpv4]); ExoPlayer would connect in the system's order.
  *
  * It listens on the loopback address only, and serves only URLs registered through the channel.
  */
@@ -28,8 +31,11 @@ object PlaybackProxy {
     private const val CHANNEL = "youpipe/playback_proxy"
     private const val TAG = "YouPipePlaybackProxy"
 
-    /** Tokens kept: the current and the preloaded song, plus a few that a retry may still use. */
-    private const val KEEP_TOKENS = 16
+    /**
+     * Tokens kept: the current and the preloaded song, or a video's HD manifest (up to about 8 streams), plus a few
+     * that a retry may still use.
+     */
+    private const val KEEP_TOKENS = 64
 
     private class Stream(
         val url: String,
@@ -50,7 +56,7 @@ object PlaybackProxy {
                         result.error("BAD_ARGS", "url is required", null)
                         return@setMethodCallHandler
                     }
-                    val mime = call.argument<String>("mimeType") ?: "audio/webm"
+                    val mime = call.argument<String>("mimeType") ?: "application/octet-stream"
                     val size = call.argument<Number>("contentLength")?.toLong()?.takeIf { it > 0 }
                     try {
                         result.success(urlFor(url, mime, size))

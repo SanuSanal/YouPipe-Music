@@ -7,6 +7,7 @@ import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -47,11 +48,18 @@ object Googlevideo {
     }
 
     /** YouTube's "Sign in to confirm that you're not a bot", which it gives a flagged address. */
-    fun isBotCheck(e: Throwable): Boolean = e.message.orEmpty().contains("not a bot")
+    fun isBotCheck(e: Throwable): Boolean =
+        e is SignInConfirmNotBotException || e.message.orEmpty().contains("not a bot")
 
-    /** Moves to the other address family after a bot check, and remembers it for the next launches. */
-    fun switchFamily() {
-        preferIpv4 = !preferIpv4
+    /**
+     * Moves to the other address family after a bot check over [from], and remembers it for the next launches.
+     * Does nothing if another request has already moved off [from]: two bot checks at once (a song and the
+     * preloaded next one) would otherwise flip back onto the flagged family.
+     */
+    @Synchronized
+    fun switchFamily(from: Boolean) {
+        if (preferIpv4 != from) return
+        preferIpv4 = !from
         prefs?.edit()?.putBoolean(KEY_IPV4, preferIpv4)?.apply()
         // Pooled connections still use the old family.
         client.connectionPool.evictAll()

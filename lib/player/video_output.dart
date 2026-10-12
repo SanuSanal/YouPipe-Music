@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
 
 import '../data/error_log.dart';
+import '../data/playback_proxy.dart';
 import '../data/stream_resolver.dart';
 import 'cast.dart';
 
@@ -22,6 +24,9 @@ class NoVideoException implements Exception {
 /// (ExoPlayer) on the full player, as the audio handler's active output. In HD it plays a local DASH
 /// manifest that joins the video-only streams with the audio (docs/streaming.md); in data saver mode,
 /// or when there's no HD, it plays YouTube's muxed 360p stream.
+///
+/// Both play through the loopback proxy (docs/streaming.md), so the video is fetched over the same
+/// address family (IPv4/IPv6) as its extraction after a bot check.
 ///
 /// It keeps playing (as sound) in the background, so the notification and the lock screen player
 /// carry on through the handler.
@@ -93,10 +98,12 @@ class VideoOutput implements RemotePlayback {
       try {
         final stream = await resolveHd(id, quality);
         if (_key != key) return null;
+        final manifest = await _relayedManifest(stream.manifestPath!);
+        if (_key != key) return null;
         // A file URI still goes through the plugin's HTTP data source, so the manifest's googlevideo
-        // requests carry the User-Agent.
+        // requests carry the User-Agent (when the proxy is unavailable and they go direct).
         hd = VideoPlayerController.networkUrl(
-          Uri.file(stream.manifestPath!),
+          Uri.file(manifest),
           formatHint: VideoFormat.dash,
           httpHeaders: {'User-Agent': stream.userAgent},
           videoPlayerOptions: options,
@@ -120,12 +127,35 @@ class VideoOutput implements RemotePlayback {
     final stream = await resolve(id);
     if (_key != key) return null;
     final c = VideoPlayerController.networkUrl(
-      Uri.parse(stream.url),
+      await _relayed(stream.url),
       httpHeaders: {'User-Agent': stream.userAgent},
       videoPlayerOptions: options,
     );
     await c.initialize();
     return c;
+  }
+
+  /// The muxed stream through the loopback proxy; straight from googlevideo if the proxy can't start.
+  Future<Uri> _relayed(String url) async {
+    try {
+      return await PlaybackProxy.uri(url, mimeType: 'video/mp4');
+    } catch (e) {
+      errorLog.add('video', 'Playback proxy unavailable: $e');
+      return Uri.parse(url);
+    }
+  }
+
+  /// A copy of the manifest at [path] whose streams play through the loopback proxy, written for this
+  /// load (its loopback URLs are registered afresh); the manifest itself if the proxy can't start.
+  Future<String> _relayedManifest(String path) async {
+    try {
+      final relayed = path.replaceFirst(RegExp(r'\.mpd$'), '.relay.mpd');
+      await File(relayed).writeAsString(await PlaybackProxy.relayManifest(await File(path).readAsString()));
+      return relayed;
+    } catch (e) {
+      errorLog.add('video', 'Playback proxy unavailable: $e');
+      return path;
+    }
   }
 
   void _emit(VideoPlayerController c, String key) {

@@ -35,6 +35,7 @@
 - **The Library "Recent activity" sort** doesn't do anything yet.
 - **Android Auto:** playback and the launcher entry work on a real car (sideloaded builds need Unknown sources, see playback.md). Browsing the tree and voice or keyboard search in the car are still unchecked.
 - **Downloads stop** if the app process dies, because there's no WorkManager.
+- **YouTube's bot check:** after heavy use, YouTube may answer "Sign in to confirm that you're not a bot" for anonymous playback from an address. The app switches to the other address family (IPv4/IPv6) and retries, and songs and video follow it through the playback proxy (streaming.md). Tested on the phone with the IPv4 preference forced (2026-10-12); the real bot check hasn't been seen in this app yet. If both families are flagged, the player says so (`BOT_CHECK`).
 - **Unavailable songs:**
   - **While casting,** an unavailable song still fails on the receiver: `CastProxy` resolves the audio natively, without the music-video fallback.
   - **Up next** doesn't grey out songs known to be unplayable.
